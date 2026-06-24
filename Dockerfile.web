@@ -1,0 +1,32 @@
+# Stage 1: Builder
+# Pin to Node 24 LTS to match package.json engines.node ">=24.0.0".
+FROM node:24-alpine AS builder
+WORKDIR /app
+RUN corepack enable && corepack prepare pnpm@latest --activate
+COPY package.json pnpm-lock.yaml* ./
+RUN pnpm install --frozen-lockfile
+COPY . .
+RUN pnpm run build
+
+# Stage 2: Production
+# node:24-alpine matches the builder and the project's engine requirement.
+FROM node:24-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+RUN addgroup -g 1001 -S onestopnews && adduser -S onestopnews -u 1001
+# Install wget for the HEALTHCHECK (alpine doesn't ship with curl).
+RUN apk add --no-cache wget
+# next.config.ts sets output: "standalone" so .next/standalone contains a
+# self-contained server.js with only the production deps bundled in.
+COPY --from=builder --chown=onestopnews:onestopnews /app/.next/standalone ./
+COPY --from=builder --chown=onestopnews:onestopnews /app/.next/static ./.next/static
+USER onestopnews
+EXPOSE 3000
+
+# Phase 19 (M9): Health check hitting /api/health (returns 200 with DB+Redis
+# status JSON, or 503 if either dep is down). Docker restarts the container
+# if the check fails 3 consecutive times.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD wget -qO- http://localhost:3000/api/health || exit 1
+
+CMD ["node", "server.js"]

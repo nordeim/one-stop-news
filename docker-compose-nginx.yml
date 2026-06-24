@@ -1,0 +1,41 @@
+# Override file to add Nginx reverse proxy with self‑signed SSL.
+# Usage: docker compose -f docker-compose-dev.yml -f docker-compose-nginx.yml up -d
+# Generate self‑signed certificates before first use:
+#   mkdir -p nginx/certs
+#   openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+#     -keyout nginx/certs/server.key -out nginx/certs/server.crt \
+#     -subj "/C=SG/ST=Singapore/L=Singapore/O=OneStopNews/CN=localhost"
+# Then access https://localhost:8443
+
+services:
+  nginx:
+    image: nginx:1-alpine
+    container_name: onestopnews-nginx
+    ports:
+      - "8443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - web
+    networks:
+      - onestopnews-network
+    restart: unless-stopped
+
+# Create nginx/nginx.conf with this content:
+#
+# server {
+#     listen 443 ssl http2;
+#     server_name localhost;
+#     ssl_certificate /etc/nginx/certs/server.crt;
+#     ssl_certificate_key /etc/nginx/certs/server.key;
+#
+#     location / {
+#         proxy_pass http://web:3000;
+#         proxy_http_version 1.1;
+#         proxy_set_header Upgrade $http_upgrade;
+#         proxy_set_header Connection 'upgrade';
+#         proxy_set_header Host $host;
+#         proxy_cache_bypass $http_upgrade;
+#     }
+# }

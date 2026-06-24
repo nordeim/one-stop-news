@@ -1,0 +1,33 @@
+node_modules/
+.next/
+venv/
+.venv/
+.venv
+vendor/
+bak.git/
+plan/
+plans/
+backup/
+nohup.out
+.windsurfrules
+upload/
+.agent
+.gemini
+.claude
+.agents
+
+# ── Build artifacts / remediation archives (Phase 22 / N2 fix) ───────────
+# Tarball archives of past remediation phases should never be committed —
+# they bloat the repo (119MB+ in 3 files) and create confusion with the
+# live source tree. Use git history or external storage for snapshots.
+*.tar.gz
+*.tar.bz2
+*.tgz
+
+# ── Environment files (CRITICAL: never commit real secrets) ──────────────
+# Only .env.example is tracked — it contains placeholder values for documentation.
+# All other .env* files contain real secrets (DB passwords, API keys, VAPID keys,
+# encryption keys) and MUST NOT be committed to version control.
+.env
+.env.*
+!.env.example

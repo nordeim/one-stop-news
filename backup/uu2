@@ -1,0 +1,31 @@
+# New Files Created (8)
+File | Purpose
+src/features/articles/queries.ts	getArticleWithSummary(id) query
+src/features/articles/queries.test.ts	4 tests for the query
+src/features/articles/components/ArticleData.test.tsx	8 tests for the component
+src/workers/jobs/summarizeFailure.ts	getSummaryFailureState() pure function
+src/workers/jobs/summarizeFailure.test.ts	6 tests for failure state
+src/workers/pipeline.integration.test.ts	8 integration tests for ingest pipeline
+src/app/api/push/subscribe/route.test.ts	6 tests for push subscribe (encryptedKeys)
+playwright.config.ts	Playwright E2E config
+e2e/smoke.spec.ts	10 E2E smoke tests
+
+Schema Changes (1 additive migration)
+Migration | Changes
+drizzle/0004_smiling_newton_destine.sql	ALTER TABLE push_subscriptions ALTER COLUMN keys DROP NOT NULL; + ADD COLUMN encrypted_keys text;
+
+# Files Modified (8)
+File | Change
+src/domain/articles/normalize.ts	hashContent signature: added body parameter
+src/domain/articles/normalize.test.ts	Updated tests for new signature + property-based test
+src/workers/index.ts	Pass body to hashContent; use getSummaryFailureState in catch block
+src/app/api/articles/route.ts	getClientIp supports TRUSTED_PROXY env var
+src/app/api/articles/route.test.ts	5 new tests for trusted proxy IP extraction
+src/lib/db/schema.ts	Added encryptedKeys column; keys now nullable
+src/app/api/push/subscribe/route.ts	Store in encryptedKeys column (not keys.p256dh)
+src/features/articles/components/ArticleData.tsx	Full rewrite: real data fetch + SummaryPanel + 404 state
+src/app/article/[id]/page.tsx	Added generateMetadata for 3-layer provenance + SEO
+vitest.config.ts	Exclude e2e/ from vitest
+eslint.config.mjs	Exclude e2e/ + playwright.config.ts from ESLint
+tsconfig.json	Exclude e2e/ + playwright.config.ts from tsc
+

@@ -1,0 +1,156 @@
+$ rm -rf .next/
+
+$ pnpm install
+Lockfile is up to date, resolution step is skipped
+Already up to date
+. prepare$ husky
+└─ Done in 72ms
+Done in 1.9s
+
+$ pnpm check
+
+> onestopnews@0.1.0 check /home/project/onestopnews
+> tsc --noEmit && pnpm lint
+
+
+> onestopnews@0.1.0 lint /home/project/onestopnews
+> eslint . --max-warnings 0
+
+$ pnpm build
+
+> onestopnews@0.1.0 build /home/project/onestopnews
+> next build
+
+▲ Next.js 16.2.9 (Turbopack)
+- Environments: .env.local, .env
+- Cache Components enabled
+- Experiments (use with caution):
+  ✓ viewTransition
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 12.3s
+✓ Finished TypeScript in 9.2s
+  Collecting page data using 3 workers  .[env] WARNING: NODE_ENV=production but TRUSTED_PROXY is not set to 'true'.
+  The rate limiter will use the leftmost (client-supplied) X-Forwarded-For IP,
+  which is spoofable. Set TRUSTED_PROXY=true if behind a CDN/reverse proxy.
+  For finer-grained control, also set TRUSTED_PROXY_CIDRS to walk the proxy chain.
+[env] WARNING: NODE_ENV=production but TRUSTED_PROXY is not set to 'true'.
+  The rate limiter will use the leftmost (client-supplied) X-Forwarded-For IP,
+  which is spoofable. Set TRUSTED_PROXY=true if behind a CDN/reverse proxy.
+  For finer-grained control, also set TRUSTED_PROXY_CIDRS to walk the proxy chain.
+[env] WARNING: NODE_ENV=production but TRUSTED_PROXY is not set to 'true'.
+  The rate limiter will use the leftmost (client-supplied) X-Forwarded-For IP,
+  which is spoofable. Set TRUSTED_PROXY=true if behind a CDN/reverse proxy.
+  For finer-grained control, also set TRUSTED_PROXY_CIDRS to walk the proxy chain.
+  Collecting page data using 3 workers  ...[env] WARNING: NODE_ENV=production but TRUSTED_PROXY is not set to 'true'.
+  The rate limiter will use the leftmost (client-supplied) X-Forwarded-For IP,
+  which is spoofable. Set TRUSTED_PROXY=true if behind a CDN/reverse proxy.
+  For finer-grained control, also set TRUSTED_PROXY_CIDRS to walk the proxy chain.
+[env] WARNING: NODE_ENV=production but TRUSTED_PROXY is not set to 'true'.
+  The rate limiter will use the leftmost (client-supplied) X-Forwarded-For IP,
+  which is spoofable. Set TRUSTED_PROXY=true if behind a CDN/reverse proxy.
+  For finer-grained control, also set TRUSTED_PROXY_CIDRS to walk the proxy chain.
+[env] WARNING: NODE_ENV=production but TRUSTED_PROXY is not set to 'true'.
+  The rate limiter will use the leftmost (client-supplied) X-Forwarded-For IP,
+  which is spoofable. Set TRUSTED_PROXY=true if behind a CDN/reverse proxy.
+  For finer-grained control, also set TRUSTED_PROXY_CIDRS to walk the proxy chain.
+✓ Collecting page data using 3 workers in 1301ms
+✓ Generating static pages using 3 workers (15/15) in 1119ms
+✓ Finalizing page optimization in 3.0s
+
+Route (app)                    Revalidate  Expire
+┌ ○ /                                  2m     10m
+├ ○ /_not-found
+├ ◐ /account
+├ ◐ /admin/sources                     2m     10m
+├ ◐ /admin/summaries                   2m     10m
+├ ƒ /api/articles
+├ ƒ /api/auth/[[...nextauth]]
+├ ƒ /api/categories
+├ ƒ /api/health
+├ ƒ /api/push/subscribe
+├ ƒ /api/summarize/[id]
+├ ◐ /article/[id]
+│ └ /article/[id]
+├ ○ /auth-error
+├ ◐ /search
+├ ○ /sign-in
+└ ◐ /topics/[category]
+  └ /topics/[category]
+
+
+○  (Static)             prerendered as static content
+◐  (Partial Prerender)  prerendered as static HTML with dynamic server-streamed content
+ƒ  (Dynamic)            server-rendered on demand
+
+$ NODE_ENV="development" pnpm dev
+
+> onestopnews@0.1.0 dev /home/project/onestopnews
+> next dev --turbo
+
+▲ Next.js 16.2.9 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.2.132:3000
+- Environments: .env.local, .env
+✓ Ready in 477ms
+- Cache Components enabled
+- Experiments (use with caution):
+  ✓ viewTransition
+
+○ Compiling / ...
+Query: select "articles"."id", "articles"."title", "articles"."excerpt", "articles"."canonical_url", "articles"."published_at", "articles"."has_summary", "articles"."summary_status", "sources"."id", "sources"."name", "sources"."url" from "articles" inner join "sources" on "articles"."source_id" = "sources"."id" order by "articles"."published_at" desc limit $1 -- params: [7]
+ Cache  Query: select "articles"."id", "articles"."title", "articles"."excerpt", "articles"."canonical_url", "articles"."published_at", "articles"."has_summary", "articles"."summary_status", "sources"."id", "sources"."name", "sources"."url" from "articles" inner join "sources" on "articles"."source_id" = "sources"."id" order by "articles"."published_at" desc limit $1 -- params: [7]
+ Cache  Query: select "articles"."id", "articles"."title", "articles"."excerpt", "articles"."canonical_url", "articles"."published_at", "articles"."has_summary", "articles"."summary_status", "sources"."id", "sources"."name", "sources"."url" from "articles" inner join "sources" on "articles"."source_id" = "sources"."id" order by "articles"."published_at" desc limit $1 -- params: [7]
+ GET / 200 in 6.9s (next.js: 5.5s, application-code: 1359ms)
+○ Compiling /api/auth/[[...nextauth]] ...
+ GET /api/auth/session 200 in 4.4s (next.js: 4.4s, application-code: 40ms)
+ GET /api/auth/session 200 in 76ms (next.js: 64ms, application-code: 11ms)
+Query: select "articles"."id", "articles"."title", "articles"."excerpt", "articles"."body", "articles"."canonical_url", "articles"."content_hash", "articles"."content_availability", "articles"."importance_score", "articles"."has_summary", "articles"."summary_status", "articles"."political_leaning", "articles"."published_at", "articles"."ingested_at", "articles"."search_vector", "articles"."source_id", "articles"."category_id", "articles"."subcategory_id", "sources"."id", "sources"."name", "sources"."url", "categories"."id", "categories"."name", "categories"."slug", "summaries"."id", "summaries"."article_id", "summaries"."summary_text", "summaries"."key_points", "summaries"."sources_cited", "summaries"."model", "summaries"."tokens_used", "summaries"."generated_at", "summaries"."status", "summaries"."flag_reason", "summaries"."ai_statement", "summaries"."compliance_statement", "summaries"."coverage_percentage", "summaries"."original_article_url" from "articles" inner join "sources" on "articles"."source_id" = "sources"."id" left join "categories" on "articles"."category_id" = "categories"."id" left join "summaries" on ("articles"."id" = "summaries"."article_id" and "summaries"."status" = $1) where "articles"."id" = $2 limit $3 -- params: ["ok", "1a34fe3e-c107-45c2-a773-e22b021c26ec", 1]
+Query: select "articles"."id", "articles"."title", "articles"."excerpt", "articles"."body", "articles"."canonical_url", "articles"."content_hash", "articles"."content_availability", "articles"."importance_score", "articles"."has_summary", "articles"."summary_status", "articles"."political_leaning", "articles"."published_at", "articles"."ingested_at", "articles"."search_vector", "articles"."source_id", "articles"."category_id", "articles"."subcategory_id", "sources"."id", "sources"."name", "sources"."url", "categories"."id", "categories"."name", "categories"."slug", "summaries"."id", "summaries"."article_id", "summaries"."summary_text", "summaries"."key_points", "summaries"."sources_cited", "summaries"."model", "summaries"."tokens_used", "summaries"."generated_at", "summaries"."status", "summaries"."flag_reason", "summaries"."ai_statement", "summaries"."compliance_statement", "summaries"."coverage_percentage", "summaries"."original_article_url" from "articles" inner join "sources" on "articles"."source_id" = "sources"."id" left join "categories" on "articles"."category_id" = "categories"."id" left join "summaries" on ("articles"."id" = "summaries"."article_id" and "summaries"."status" = $1) where "articles"."id" = $2 limit $3 -- params: ["ok", "1a34fe3e-c107-45c2-a773-e22b021c26ec", 1]
+ GET /article/1a34fe3e-c107-45c2-a773-e22b021c26ec 200 in 1728ms (next.js: 1555ms, generate-params: 647ms, application-code: 173ms)
+ GET /sign-in 200 in 830ms (next.js: 764ms, application-code: 67ms)
+ Cache  Query: select "articles"."id", "articles"."title", "articles"."excerpt", "articles"."canonical_url", "articles"."published_at", "articles"."has_summary", "articles"."summary_status", "sources"."id", "sources"."name", "sources"."url" from "articles" inner join "sources" on "articles"."source_id" = "sources"."id" order by "articles"."published_at" desc limit $1 -- params: [7]
+ GET / 200 in 409ms (next.js: 5ms, application-code: 404ms)
+ GET /api/auth/session 200 in 87ms (next.js: 75ms, application-code: 12ms)
+ GET /api/auth/session 200 in 14ms (next.js: 5ms, application-code: 9ms)
+ GET /search 200 in 1007ms (next.js: 918ms, application-code: 89ms)
+ POST /search 200 in 38ms (next.js: 4ms, application-code: 34ms)
+  └─ ƒ searchArticlesAction({"query":""}) in 6ms src/features/search/actions.ts
+ POST /search 200 in 44ms (next.js: 26ms, application-code: 18ms)
+  └─ ƒ searchArticlesAction({"query":""}) in 1ms src/features/search/actions.ts
+ POST /search 200 in 35ms (next.js: 7ms, application-code: 28ms)
+  └─ ƒ searchArticlesAction({"query":""}) in 2ms src/features/search/actions.ts
+ POST /search 200 in 14ms (next.js: 3ms, application-code: 11ms)
+  └─ ƒ searchArticlesAction({"query":""}) in 2ms src/features/search/actions.ts
+ POST /search 200 in 17ms (next.js: 2ms, application-code: 15ms)
+  └─ ƒ searchArticlesAction({"query":""}) in 2ms src/features/search/actions.ts
+ POST /search 200 in 12ms (next.js: 3ms, application-code: 10ms)
+  └─ ƒ searchArticlesAction({"query":""}) in 1ms src/features/search/actions.ts
+ POST /search 200 in 14ms (next.js: 3ms, application-code: 11ms)
+  └─ ƒ searchArticlesAction({"query":""}) in 2ms src/features/search/actions.ts
+ POST /search 200 in 18ms (next.js: 3ms, application-code: 15ms)
+  └─ ƒ searchArticlesAction({"query":""}) in 2ms src/features/search/actions.ts
+ POST /search 200 in 16ms (next.js: 3ms, application-code: 12ms)
+  └─ ƒ searchArticlesAction({"query":""}) in 2ms src/features/search/actions.ts
+ POST /search 200 in 18ms (next.js: 4ms, application-code: 14ms)
+  └─ ƒ searchArticlesAction({"query":""}) in 1ms src/features/search/actions.ts
+ POST /search 200 in 17ms (next.js: 3ms, application-code: 15ms)
+  └─ ƒ searchArticlesAction({"query":""}) in 3ms src/features/search/actions.ts
+ POST /search 200 in 14ms (next.js: 3ms, application-code: 11ms)
+  └─ ƒ searchArticlesAction({"query":""}) in 1ms src/features/search/actions.ts
+ POST /search 200 in 16ms (next.js: 3ms, application-code: 12ms)
+  └─ ƒ searchArticlesAction({"query":""}) in 2ms src/features/search/actions.ts
+ POST /search 200 in 19ms (next.js: 4ms, application-code: 15ms)
+  └─ ƒ searchArticlesAction({"query":""}) in 2ms src/features/search/actions.ts
+
+
+  └─ ƒ searchArticlesAction({"query":""}) in 1ms src/features/search/actions.ts
+ Cache  Query: select "articles"."id", "articles"."title", "articles"."excerpt", "articles"."canonical_url", "articles"."published_at", "articles"."has_summary", "articles"."summary_status", "sources"."id", "sources"."name", "sources"."url" from "articles" inner join "sources" on "articles"."source_id" = "sources"."id" order by "articles"."published_at" desc limit $1 -- params: [7]
+ POST /search 200 in 279ms (next.js: 88ms, application-code: 191ms)
+  └─ ƒ searchArticlesAction({"query":""}) in 2ms src/features/search/actions.ts
+ POST /search 200 in 29ms (next.js: 4ms, application-code: 25ms)
+  └─ ƒ searchArticlesAction({"query":""}) in 4ms src/features/search/actions.ts
+ GET / 200 in 528ms (next.js: 8ms, application-code: 520ms)
+ GET /api/auth/session 200 in 125ms (next.js: 101ms, application-code: 24ms)
+ GET /api/auth/session 200 in 28ms (next.js: 10ms, application-code: 18ms)
+

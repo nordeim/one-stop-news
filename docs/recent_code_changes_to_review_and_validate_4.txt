@@ -1,0 +1,104 @@
+diff --git a/src/features/articles/queries.ts b/src/features/articles/queries.ts
+index ad423ad..3e8d997 100644
+--- a/src/features/articles/queries.ts
++++ b/src/features/articles/queries.ts
+@@ -86,7 +86,7 @@ export async function getArticleWithSummary(
+   const row = rows[0];
+   if (!row) return null;
+ 
+-  // Cast to ArticleWithSummary — Drizzle's leftJoin types the summary as
+-  // potentially null, which matches our ArticleWithSummary interface.
+-  return row as unknown as ArticleWithSummary;
++  // Structural cast — Drizzle's leftJoin result shape matches
++  // ArticleWithSummary exactly, so a single assertion is sufficient.
++  return row as ArticleWithSummary;
+ }
+diff --git a/src/lib/auth/index.ts b/src/lib/auth/index.ts
+index 65764e0..9e8fcd0 100644
+--- a/src/lib/auth/index.ts
++++ b/src/lib/auth/index.ts
+@@ -51,8 +51,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
+     jwt({ token, user, trigger, session }) {
+       if (user) {
+         token.id = user.id;
+-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+-        token.role = (user as any).role ?? "reader";
++        token.role = user.role ?? "reader";
+       }
+       if (trigger === "update" && session?.name) {
+         token.name = session.name;
+@@ -61,10 +60,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
+     },
+     session({ session, token }) {
+       if (token && session.user) {
+-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+-        (session.user as any).id = token.id as string;
+-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+-        (session.user as any).role = token.role as string;
++        session.user.id = token.id ?? "";
++        session.user.role = token.role ?? "reader";
+       }
+       return session;
+     },
+diff --git a/src/lib/queue/index.ts b/src/lib/queue/index.ts
+index e76b96a..17a4568 100644
+--- a/src/lib/queue/index.ts
++++ b/src/lib/queue/index.ts
+@@ -1,5 +1,6 @@
+ import { Queue } from "bullmq";
+ import { env } from "@/lib/env";
++import type { Redis } from "ioredis";
+ 
+ // ── Redis Connection Factories ──────────────────────────────────────────────
+ // Per MEP v5.1: Worker and Queue (producer) connections have different configs.
+@@ -69,14 +70,44 @@ export const feedSliceQueue = new Queue("feed-slice", {
+ });
+ 
+ // ── Redis Ping Utility (for health checks) ──────────────────────────────────
++let _pingRedisClient: Redis | null = null;
++
++/**
++ * Ping Redis using a singleton client.
++ *
++ * Reuses a single connection across calls to avoid socket/TCP churn.
++ * On ping failure, disconnects and nullifies the client so the next
++ * call will attempt to reconnect.
++ */
+ export async function pingRedis(): Promise<boolean> {
+-  const { Redis } = await import("ioredis");
+-  const redis = new Redis(getRedisUrlParts());
+   try {
+-    await redis.ping();
+-    await redis.quit();
++    if (!_pingRedisClient) {
++      const { Redis } = await import("ioredis");
++      const { host, port } = getRedisUrlParts();
++      _pingRedisClient = new Redis({
++        host,
++        port,
++        maxRetriesPerRequest: 3,
++        connectTimeout: 5000,
++        enableOfflineQueue: false,
++      });
++
++      _pingRedisClient.on("error", (err: Error) => {
++        console.warn("[Redis Ping Client] Error encountered:", err.message);
++      });
++    }
++
++    await _pingRedisClient.ping();
+     return true;
+   } catch {
++    if (_pingRedisClient) {
++      try {
++        _pingRedisClient.disconnect();
++      } catch {
++        // Best-effort disconnect — ignore errors during cleanup.
++      }
++      _pingRedisClient = null;
++    }
+     return false;
+   }
+-}
+\ No newline at end of file
++}

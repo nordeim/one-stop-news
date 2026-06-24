@@ -1,0 +1,104 @@
+diff --git a/src/features/articles/components/ArticleData.tsx b/src/features/articles/components/ArticleData.tsx
+index 3b98bbd..f25b8ad 100644
+--- a/src/features/articles/components/ArticleData.tsx
++++ b/src/features/articles/components/ArticleData.tsx
+@@ -10,8 +10,9 @@
+  *     as <meta> tags (NOT <script> tags), so JSON-LD MUST be a direct
+  *     <script> element in the body. React 19 supports this in Server
+  *     Components; the `key` prop deduplicates across renders.
+- *   - Layer 2 (HTTP header X-AI-Provenance): Emitted via metadata.other
+- *     in page.tsx generateMetadata().
++ *   - Layer 2 (HTTP header X-AI-Provenance): Set statically in next.config.ts
++ *     headers() for /article/:id* routes (Phase 23 / BUG-2 fix). Previously
++ *     incorrectly documented as emitted via metadata.other.
+  *   - Layer 3 (<meta name="ai-provenance">): Emitted via metadata.other
+  *     in page.tsx generateMetadata().
+  *
+diff --git a/src/features/articles/queries.test.ts b/src/features/articles/queries.test.ts
+index 8c9333a..2d52ccb 100644
+--- a/src/features/articles/queries.test.ts
++++ b/src/features/articles/queries.test.ts
+@@ -43,8 +43,11 @@ vi.mock("@/lib/db/schema", () => ({
+   },
+ }));
+ 
++import { eq } from "drizzle-orm";
++
+ vi.mock("drizzle-orm", () => ({
+   eq: vi.fn(),
++  and: vi.fn(),
+ }));
+ 
+ const { getArticleWithSummary } = await import("./queries");
+diff --git a/src/features/articles/queries.ts b/src/features/articles/queries.ts
+index 4e428da..eff19fe 100644
+--- a/src/features/articles/queries.ts
++++ b/src/features/articles/queries.ts
+@@ -9,7 +9,7 @@
+ 
+ import { db } from "@/lib/db";
+ import { articles, sources, categories, summaries } from "@/lib/db/schema";
+-import { eq } from "drizzle-orm";
++import { eq, and } from "drizzle-orm";
+ import type { ArticleWithSummary } from "@/domain/articles/types";
+ 
+ /**
+@@ -79,7 +79,10 @@ export async function getArticleWithSummary(
+     .from(articles)
+     .innerJoin(sources, eq(articles.sourceId, sources.id))
+     .leftJoin(categories, eq(articles.categoryId, categories.id))
+-    .leftJoin(summaries, eq(articles.id, summaries.articleId))
++    .leftJoin(
++      summaries,
++      and(eq(articles.id, summaries.articleId), eq(summaries.status, "ok")),
++    )
+     .where(eq(articles.id, id))
+     .limit(1);
+ 
+diff --git a/src/features/summaries/actions.ts b/src/features/summaries/actions.ts
+index ba004d6..f08241c 100644
+--- a/src/features/summaries/actions.ts
++++ b/src/features/summaries/actions.ts
+@@ -158,6 +158,13 @@ export async function flagSummary(
+     })
+     .where(eq(summaries.id, summaryId));
+ 
++  // Reset article's hasSummary flag to prevent stale data from
++  // affecting scoring and UI badges (C2 fix).
++  await db
++    .update(articles)
++    .set({ hasSummary: false })
++    .where(eq(articles.id, summaryId));
++
+   revalidatePath("/admin/summaries");
+   return { success: true, error: null };
+ }
+@@ -178,6 +185,13 @@ export async function disableSummary(
+     .set({ status: "disabled" })
+     .where(eq(summaries.id, summaryId));
+ 
++  // Reset article's hasSummary flag to prevent stale data from
++  // affecting scoring and UI badges (C2 fix).
++  await db
++    .update(articles)
++    .set({ hasSummary: false })
++    .where(eq(articles.id, summaryId));
++
+   revalidatePath("/admin/summaries");
+   return { success: true, error: null };
+ }
+@@ -202,6 +216,14 @@ export async function approveSummary(
+     .set({ status: "ok", flagReason: null })
+     .where(eq(summaries.id, summaryId));
+ 
++  // C2 fix: When a summary is approved (restored to 'ok'), ensure the
++  // article's hasSummary flag is set to true so scoring and UI badges
++  // reflect the restored summary.
++  await db
++    .update(articles)
++    .set({ hasSummary: true })
++    .where(eq(articles.id, summaryId));
++
+   revalidatePath("/admin/summaries");
+   return { success: true, error: null };
+ }

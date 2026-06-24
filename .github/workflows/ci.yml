@@ -1,0 +1,139 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Validate Shell Scripts & Docker Compose Configs
+        # Fail-fast gate: catch malformed shebangs, syntax errors in shell
+        # scripts, and invalid YAML in docker-compose files BEFORE the
+        # expensive pnpm install / build steps. This is the "no TDD" gate
+        # for infra-only changes (shell scripts, docker-compose, etc.)
+        # that don't have unit tests.
+        #
+        # Checks:
+        #   1. bash -n on all .sh files — catches syntax errors
+        #   2. Shebang must be exactly #!/bin/bash or #!/usr/bin/env bash
+        #      (no concatenated comment text after the shebang on line 1)
+        #   3. Python yaml.safe_load on all docker-compose*.yml files —
+        #      catches malformed YAML and structural errors
+        run: |
+          set -euo pipefail
+          echo "-- bash -n + shebang check on all .sh files --"
+          find scripts -name '*.sh' -type f -print0 | while IFS= read -r -d '' f; do
+            echo "  checking: $f"
+            bash -n "$f"
+            first_line=$(head -1 "$f")
+            if [[ ! "$first_line" =~ ^#!/(bin/bash|usr/bin/env\ bash)$ ]]; then
+              echo "ERROR: $f has malformed shebang: '$first_line'"
+              echo "  Expected: #!/bin/bash OR #!/usr/bin/env bash (no trailing text)"
+              exit 1
+            fi
+          done
+          echo "-- YAML validation on docker-compose files --"
+          python3 scripts/validate-compose.py
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.x"
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Security Audit (S6) — hard gate (Phase 22 / F4 fix)
+        # S6 fix: Run pnpm audit to catch known vulnerabilities in dependencies.
+        # Uses --audit-level=high to only fail on high/critical severity.
+        # Production dependencies (--prod) are checked; dev dependencies are
+        # excluded since they don't ship to production.
+        #
+        # Phase 22 (F4 fix, audit Report 16): The `|| true` was removed — the
+        # audit is now a HARD GATE that fails CI on any new high/critical
+        # vulnerability. This was deferred in Phase 21 S6 pending verification
+        # of the dependency tree. After H2 mitigation (cheerio>undici override
+        # to ^8.5.0), the audit now reports only 1 moderate vuln — well below
+        # the --audit-level=high threshold. The gate will fail if any new
+        # high/critical CVEs are introduced.
+        #
+        # If a new high/critical vuln is reported:
+        #   1. Investigate the affected package (pnpm audit --prod for full list)
+        #   2. Apply an override in package.json pnpm.overrides OR upgrade
+        #   3. If no fix is available, document the risk in AGENTS.md and
+        #      temporarily re-add `|| true` with a TODO + remediation date
+        run: pnpm audit --audit-level=high --prod
+      - name: Check Formatting
+        run: pnpm run format:check
+      - name: Run Linter
+        run: pnpm run lint
+      - name: Run Unit Tests
+        run: pnpm run test
+      - name: Run Tests with Coverage (Phase 19 / H6 + Batch 2 / T7)
+        # Phase 19 (H6): Enforce coverage thresholds in CI.
+        # Batch 2 (T7) of the Phase 19+ remediation raised thresholds back
+        # to 80/80/70/80 (functions/lines/branches/statements) after adding
+        # the missing unit tests in T1-T6. If actual coverage falls below,
+        # the test command exits non-zero and the workflow fails — preventing
+        # coverage regressions from landing.
+        run: pnpm run test -- --coverage
+      - name: Run TypeScript Check
+        run: pnpm run check
+      - name: Build
+        run: pnpm run build
+    env:
+      # All env vars required by src/lib/env/index.ts must be present at
+      # module load time, even for lint/test/build steps. Use CI-safe dummy
+      # values — these never touch real external services.
+      DATABASE_URL: "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
+      REDIS_URL: "redis://localhost:6379"
+      AUTH_SECRET: "ci-dummy-secret-at-least-32-characters-long-xxx"
+      AUTH_URL: "http://localhost:3000"
+      ANTHROPIC_API_KEY: "sk-ant-ci-dummy-key-not-real"
+      OPENAI_API_KEY: "sk-ci-dummy-key-not-real"
+      NEXT_PUBLIC_VAPID_PUBLIC_KEY: "ci-dummy-vapid-public-key-not-real"
+      VAPID_PRIVATE_KEY: "ci-dummy-vapid-private-key-not-real"
+      VAPID_SUBJECT: "mailto:ci@onestopnews.com"
+      PUSH_KEY_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      # OAuth env vars are optional in env/index.ts. CI sets dummy values so
+      # any test that imports @/lib/auth doesn't trip env validation if the
+      # schema ever changes to require them.
+      GOOGLE_CLIENT_ID: "ci-dummy-google-client-id"
+      GOOGLE_CLIENT_SECRET: "ci-dummy-google-client-secret"
+      GITHUB_CLIENT_ID: "ci-dummy-github-client-id"
+      GITHUB_CLIENT_SECRET: "ci-dummy-github-client-secret"
+      # TRUSTED_PROXY is optional in env/index.ts. CI sets it to "true" so
+      # the route test that exercises the trusted-proxy IP-extraction path
+      # has the var available at module load time (the route reads it via
+      # the typed `env` export, not process.env directly).
+      TRUSTED_PROXY: "true"
+      NODE_ENV: "test"

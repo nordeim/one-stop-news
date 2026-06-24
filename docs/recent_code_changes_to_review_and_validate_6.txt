@@ -1,0 +1,3240 @@
+diff --git a/src/app/(public)/page.test.tsx b/src/app/(public)/page.test.tsx
+index ccf1152..2602b9a 100644
+--- a/src/app/(public)/page.test.tsx
++++ b/src/app/(public)/page.test.tsx
+@@ -6,13 +6,9 @@ import { render } from "@testing-library/react";
+ // "useSession must be wrapped in <SessionProvider>" during unit tests.
+ // In production, SessionProvider wraps the entire app in layout.tsx.
+ vi.mock("next-auth/react", () => ({
+-  useSession: vi
+-    .fn()
+-    .mockReturnValue({ data: null, status: "unauthenticated" }),
++  useSession: vi.fn().mockReturnValue({ data: null, status: "unauthenticated" }),
+   signOut: vi.fn(),
+-  SessionProvider: ({ children }: { children: React.ReactNode }) => (
+-    <>{children}</>
+-  ),
++  SessionProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+ }));
+ 
+ // Mock FeedData to avoid DB access during the unit test.
+diff --git a/src/app/(public)/search/SearchPageClient.test.tsx b/src/app/(public)/search/SearchPageClient.test.tsx
+index 764d144..7703435 100644
+--- a/src/app/(public)/search/SearchPageClient.test.tsx
++++ b/src/app/(public)/search/SearchPageClient.test.tsx
+@@ -38,16 +38,14 @@ const { SearchPageClient } = await import("./SearchPageClient");
+ beforeEach(() => {
+   vi.clearAllMocks();
+   mockSearchParams.delete("q");
+-  mockSearchAction.mockResolvedValue({
+-    results: [],
+-    hasMore: false,
+-    nextCursor: null,
+-  });
++  mockSearchAction.mockResolvedValue({ results: [], hasMore: false, nextCursor: null });
+ });
+ 
+ describe("SearchPageClient — initial render", () => {
+   it("renders SearchBar with search role", () => {
+-    render(<SearchPageClient initialResults={[]} initialQuery="" />);
++    render(
++      <SearchPageClient initialResults={[]} initialQuery="" />
++    );
+     expect(screen.getByRole("search")).toBeDefined();
+   });
+ });
+@@ -55,18 +53,16 @@ describe("SearchPageClient — initial render", () => {
+ describe("SearchPageClient — successful search", () => {
+   it("calls searchArticlesAction on search input change and updates results", async () => {
+     mockSearchAction.mockResolvedValue({
+-      results: [
+-        {
+-          article: {
+-            id: "a1",
+-            title: "Test",
+-            excerpt: "Excerpt",
+-            source: { id: "s1", name: "Test Source" },
+-            category: { id: "c1", name: "Tech", slug: "tech" },
+-            publishedAt: new Date("2026-01-15T10:00:00Z"),
+-          },
++      results: [{
++        article: {
++          id: "a1",
++          title: "Test",
++          excerpt: "Excerpt",
++          source: { id: "s1", name: "Test Source" },
++          category: { id: "c1", name: "Tech", slug: "tech" },
++          publishedAt: new Date("2026-01-15T10:00:00Z"),
+         },
+-      ],
++      }],
+       hasMore: false,
+       nextCursor: null,
+     });
+diff --git a/src/app/(public)/search/SearchPageClient.tsx b/src/app/(public)/search/SearchPageClient.tsx
+index 3b02e48..379ee13 100644
+--- a/src/app/(public)/search/SearchPageClient.tsx
++++ b/src/app/(public)/search/SearchPageClient.tsx
+@@ -28,10 +28,7 @@ interface SearchPageClientProps {
+   initialQuery: string;
+ }
+ 
+-export function SearchPageClient({
+-  initialResults,
+-  initialQuery,
+-}: SearchPageClientProps) {
++export function SearchPageClient({ initialResults, initialQuery }: SearchPageClientProps) {
+   const router = useRouter();
+   const urlSearchParams = useSearchParams();
+   const [results, setResults] = useState<SearchResult[]>(initialResults);
+@@ -39,48 +36,41 @@ export function SearchPageClient({
+   const [currentQuery, setCurrentQuery] = useState(initialQuery);
+   const [error, setError] = useState<string | null>(null);
+ 
+-  const handleSearch = useCallback(
+-    async (query: string) => {
+-      setCurrentQuery(query);
+-      setError(null); // Clear any prior error before a new attempt.
++  const handleSearch = useCallback(async (query: string) => {
++    setCurrentQuery(query);
++    setError(null); // Clear any prior error before a new attempt.
+ 
+-      // Update URL without full page reload
+-      const params = new URLSearchParams(urlSearchParams);
+-      if (query) {
+-        params.set("q", query);
+-      } else {
+-        params.delete("q");
+-      }
+-      router.push(`/search?${params.toString()}`, { scroll: false });
++    // Update URL without full page reload
++    const params = new URLSearchParams(urlSearchParams);
++    if (query) {
++      params.set("q", query);
++    } else {
++      params.delete("q");
++    }
++    router.push(`/search?${params.toString()}`, { scroll: false });
+ 
+-      setIsLoading(true);
+-      try {
+-        const { results: newResults } = await searchArticlesAction({ query });
+-        setResults(newResults);
+-      } catch (err) {
+-        // Phase 19 (H3): previously this catch block was missing — the
+-        // promise rejected silently, isLoading was reset by `finally`, and
+-        // the UI stayed in the "no results" state with no feedback that the
+-        // search had failed. Now we surface a user-friendly error message
+-        // and offer a Retry button.
+-        setError(err instanceof Error ? err.message : "Search failed");
+-        // Clear stale results so the user doesn't see outdated data mixed
+-        // with an error banner.
+-        setResults([]);
+-      } finally {
+-        setIsLoading(false);
+-      }
+-    },
+-    [router, urlSearchParams],
+-  );
++    setIsLoading(true);
++    try {
++      const { results: newResults } = await searchArticlesAction({ query });
++      setResults(newResults);
++    } catch (err) {
++      // Phase 19 (H3): previously this catch block was missing — the
++      // promise rejected silently, isLoading was reset by `finally`, and
++      // the UI stayed in the "no results" state with no feedback that the
++      // search had failed. Now we surface a user-friendly error message
++      // and offer a Retry button.
++      setError(err instanceof Error ? err.message : "Search failed");
++      // Clear stale results so the user doesn't see outdated data mixed
++      // with an error banner.
++      setResults([]);
++    } finally {
++      setIsLoading(false);
++    }
++  }, [router, urlSearchParams]);
+ 
+   return (
+     <div className="space-y-8">
+-      <SearchBar
+-        defaultValue={initialQuery}
+-        onSearch={handleSearch}
+-        isLoading={isLoading}
+-      />
++      <SearchBar defaultValue={initialQuery} onSearch={handleSearch} isLoading={isLoading} />
+       <SearchResults
+         results={results}
+         query={currentQuery}
+diff --git a/src/app/api/summarize/[id]/route.test.ts b/src/app/api/summarize/[id]/route.test.ts
+index 2f653e9..41700dc 100644
+--- a/src/app/api/summarize/[id]/route.test.ts
++++ b/src/app/api/summarize/[id]/route.test.ts
+@@ -67,19 +67,13 @@ function makeRequest(articleId: string = VALID_ARTICLE_ID): Request {
+   });
+ }
+ 
+-function mockArticle(
+-  overrides: Partial<{
+-    id: string;
+-    contentAvailability:
+-      | "title_only"
+-      | "excerpt"
+-      | "partial_text"
+-      | "full_text";
+-    summaryStatus: "none" | "pending" | "ok" | "needs_review" | "disabled";
+-    excerpt: string;
+-    title: string;
+-  }> = {},
+-) {
++function mockArticle(overrides: Partial<{
++  id: string;
++  contentAvailability: "title_only" | "excerpt" | "partial_text" | "full_text";
++  summaryStatus: "none" | "pending" | "ok" | "needs_review" | "disabled";
++  excerpt: string;
++  title: string;
++}> = {}) {
+   return {
+     id: VALID_ARTICLE_ID,
+     contentAvailability: "partial_text" as const,
+@@ -93,9 +87,7 @@ function mockArticle(
+ beforeEach(() => {
+   vi.clearAllMocks();
+   // Default: authenticated, allowed by rate limiter, valid article ready to summarize.
+-  mockVerifySession.mockResolvedValue({
+-    user: { id: "user-1", role: "reader" },
+-  });
++  mockVerifySession.mockResolvedValue({ user: { id: "user-1", role: "reader" } });
+   vi.mocked(checkRateLimit).mockResolvedValue({
+     allowed: true,
+     remaining: 5,
+@@ -111,9 +103,7 @@ beforeEach(() => {
+ describe("POST /api/summarize/[id] — auth", () => {
+   it("returns 401 when no session", async () => {
+     mockVerifySession.mockResolvedValue(null);
+-    const response = await POST(makeRequest(), {
+-      params: Promise.resolve({ id: VALID_ARTICLE_ID }),
+-    });
++    const response = await POST(makeRequest(), { params: Promise.resolve({ id: VALID_ARTICLE_ID }) });
+     expect(response.status).toBe(401);
+     const body = await response.json();
+     expect(body.error).toMatch(/authentication/i);
+@@ -122,9 +112,10 @@ describe("POST /api/summarize/[id] — auth", () => {
+ 
+ describe("POST /api/summarize/[id] — input validation", () => {
+   it("returns 400 for invalid UUID", async () => {
+-    const response = await POST(makeRequest("not-a-uuid"), {
+-      params: Promise.resolve({ id: "not-a-uuid" }),
+-    });
++    const response = await POST(
++      makeRequest("not-a-uuid"),
++      { params: Promise.resolve({ id: "not-a-uuid" }) }
++    );
+     expect(response.status).toBe(400);
+     const body = await response.json();
+     expect(body.error).toMatch(/invalid article id/i);
+@@ -133,32 +124,22 @@ describe("POST /api/summarize/[id] — input validation", () => {
+ 
+ describe("POST /api/summarize/[id] — content guard", () => {
+   it("returns 400 for title_only content availability", async () => {
+-    mockFindFirst.mockResolvedValue(
+-      mockArticle({ contentAvailability: "title_only" }),
+-    );
+-    const response = await POST(makeRequest(), {
+-      params: Promise.resolve({ id: VALID_ARTICLE_ID }),
+-    });
++    mockFindFirst.mockResolvedValue(mockArticle({ contentAvailability: "title_only" }));
++    const response = await POST(makeRequest(), { params: Promise.resolve({ id: VALID_ARTICLE_ID }) });
+     expect(response.status).toBe(400);
+     const body = await response.json();
+     expect(body.error).toMatch(/title_only/);
+   });
+ 
+   it("returns 400 for excerpt content availability", async () => {
+-    mockFindFirst.mockResolvedValue(
+-      mockArticle({ contentAvailability: "excerpt" }),
+-    );
+-    const response = await POST(makeRequest(), {
+-      params: Promise.resolve({ id: VALID_ARTICLE_ID }),
+-    });
++    mockFindFirst.mockResolvedValue(mockArticle({ contentAvailability: "excerpt" }));
++    const response = await POST(makeRequest(), { params: Promise.resolve({ id: VALID_ARTICLE_ID }) });
+     expect(response.status).toBe(400);
+   });
+ 
+   it("returns 404 for missing article", async () => {
+     mockFindFirst.mockResolvedValue(null);
+-    const response = await POST(makeRequest(), {
+-      params: Promise.resolve({ id: VALID_ARTICLE_ID }),
+-    });
++    const response = await POST(makeRequest(), { params: Promise.resolve({ id: VALID_ARTICLE_ID }) });
+     expect(response.status).toBe(404);
+   });
+ });
+@@ -166,29 +147,25 @@ describe("POST /api/summarize/[id] — content guard", () => {
+ describe("POST /api/summarize/[id] — idempotency", () => {
+   it("returns 409 when summaryStatus is not 'none'", async () => {
+     mockFindFirst.mockResolvedValue(mockArticle({ summaryStatus: "pending" }));
+-    const response = await POST(makeRequest(), {
+-      params: Promise.resolve({ id: VALID_ARTICLE_ID }),
+-    });
++    const response = await POST(makeRequest(), { params: Promise.resolve({ id: VALID_ARTICLE_ID }) });
+     expect(response.status).toBe(409);
+   });
+ });
+ 
+ describe("POST /api/summarize/[id] — rate limiting (Phase 19 / Critical C2)", () => {
+   it("calls checkRateLimit keyed on session.user.id", async () => {
+-    await POST(makeRequest(), {
+-      params: Promise.resolve({ id: VALID_ARTICLE_ID }),
+-    });
++    await POST(makeRequest(), { params: Promise.resolve({ id: VALID_ARTICLE_ID }) });
+     expect(checkRateLimit).toHaveBeenCalledWith(
+       expect.stringContaining("api:summarize:"),
+       expect.any(Number),
+-      expect.any(Number),
++      expect.any(Number)
+     );
+     // Key MUST contain the user id, not just a generic identifier — otherwise
+     // a NAT-shared IP would let one user burn the budget for everyone.
+     expect(checkRateLimit).toHaveBeenCalledWith(
+       expect.stringContaining("user-1"),
+       expect.any(Number),
+-      expect.any(Number),
++      expect.any(Number)
+     );
+   });
+ 
+@@ -198,9 +175,7 @@ describe("POST /api/summarize/[id] — rate limiting (Phase 19 / Critical C2)",
+       remaining: 0,
+       resetAt: Date.now() + 45_000, // 45s remaining
+     });
+-    const response = await POST(makeRequest(), {
+-      params: Promise.resolve({ id: VALID_ARTICLE_ID }),
+-    });
++    const response = await POST(makeRequest(), { params: Promise.resolve({ id: VALID_ARTICLE_ID }) });
+     expect(response.status).toBe(429);
+     expect(response.headers.get("Retry-After")).toBeTruthy();
+     const body = await response.json();
+@@ -213,9 +188,7 @@ describe("POST /api/summarize/[id] — rate limiting (Phase 19 / Critical C2)",
+       remaining: 0,
+       resetAt: Date.now() + 45_000,
+     });
+-    await POST(makeRequest(), {
+-      params: Promise.resolve({ id: VALID_ARTICLE_ID }),
+-    });
++    await POST(makeRequest(), { params: Promise.resolve({ id: VALID_ARTICLE_ID }) });
+     expect(mockAdd).not.toHaveBeenCalled();
+   });
+ 
+@@ -225,18 +198,14 @@ describe("POST /api/summarize/[id] — rate limiting (Phase 19 / Critical C2)",
+       remaining: 0,
+       resetAt: Date.now() + 45_000,
+     });
+-    await POST(makeRequest(), {
+-      params: Promise.resolve({ id: VALID_ARTICLE_ID }),
+-    });
++    await POST(makeRequest(), { params: Promise.resolve({ id: VALID_ARTICLE_ID }) });
+     expect(mockUpdate).not.toHaveBeenCalled();
+   });
+ });
+ 
+ describe("POST /api/summarize/[id] — success path", () => {
+   it("returns 202 with jobId on successful enqueue", async () => {
+-    const response = await POST(makeRequest(), {
+-      params: Promise.resolve({ id: VALID_ARTICLE_ID }),
+-    });
++    const response = await POST(makeRequest(), { params: Promise.resolve({ id: VALID_ARTICLE_ID }) });
+     expect(response.status).toBe(202);
+     const body = await response.json();
+     expect(body.jobId).toBe("job-1");
+diff --git a/src/app/api/summarize/[id]/route.ts b/src/app/api/summarize/[id]/route.ts
+index 1d67987..6cfdf67 100644
+--- a/src/app/api/summarize/[id]/route.ts
++++ b/src/app/api/summarize/[id]/route.ts
+@@ -23,15 +23,12 @@ const SUMMARIZE_RATE_LIMIT_WINDOW_SEC = 60;
+ 
+ export async function POST(
+   request: Request,
+-  { params }: { params: Promise<{ id: string }> },
++  { params }: { params: Promise<{ id: string }> }
+ ): Promise<NextResponse> {
+   try {
+     const session = await verifySession();
+     if (!session) {
+-      return NextResponse.json(
+-        { error: "Authentication required" },
+-        { status: 401 },
+-      );
++      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+     }
+ 
+     // ── Rate limit check (per user, not per IP) ────────────────────────────
+@@ -42,12 +39,12 @@ export async function POST(
+     const rateLimitResult = await checkRateLimit(
+       `api:summarize:${session.user.id}`,
+       SUMMARIZE_RATE_LIMIT_MAX,
+-      SUMMARIZE_RATE_LIMIT_WINDOW_SEC,
++      SUMMARIZE_RATE_LIMIT_WINDOW_SEC
+     );
+     if (!rateLimitResult.allowed) {
+       const retryAfterSec = Math.max(
+         1,
+-        Math.ceil((rateLimitResult.resetAt - Date.now()) / 1000),
++        Math.ceil((rateLimitResult.resetAt - Date.now()) / 1000)
+       );
+       return NextResponse.json(
+         { error: "Rate limit exceeded. Please retry later." },
+@@ -57,19 +54,15 @@ export async function POST(
+             "Retry-After": String(retryAfterSec),
+             "X-RateLimit-Remaining": "0",
+           },
+-        },
++        }
+       );
+     }
+ 
+     const { id: articleId } = await params;
+ 
+-    const uuidRegex =
+-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
++    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+     if (!uuidRegex.test(articleId)) {
+-      return NextResponse.json(
+-        { error: "Invalid article ID format" },
+-        { status: 400 },
+-      );
++      return NextResponse.json({ error: "Invalid article ID format" }, { status: 400 });
+     }
+ 
+     const article = await db.query.articles.findFirst({
+@@ -80,31 +73,21 @@ export async function POST(
+       return NextResponse.json({ error: "Article not found" }, { status: 404 });
+     }
+ 
+-    if (
+-      article.contentAvailability === "title_only" ||
+-      article.contentAvailability === "excerpt"
+-    ) {
++    if (article.contentAvailability === "title_only" || article.contentAvailability === "excerpt") {
+       return NextResponse.json(
+-        {
+-          error: `Cannot summarise articles with only ${article.contentAvailability}. Insufficient content.`,
+-        },
+-        { status: 400 },
++        { error: `Cannot summarise articles with only ${article.contentAvailability}. Insufficient content.` },
++        { status: 400 }
+       );
+     }
+ 
+     if (article.summaryStatus !== "none") {
+       return NextResponse.json(
+-        {
+-          error: `Summary already exists with status: ${article.summaryStatus}`,
+-        },
+-        { status: 409 },
++        { error: `Summary already exists with status: ${article.summaryStatus}` },
++        { status: 409 }
+       );
+     }
+ 
+-    await db
+-      .update(articles)
+-      .set({ summaryStatus: "pending" })
+-      .where(eq(articles.id, articleId));
++    await db.update(articles).set({ summaryStatus: "pending" }).where(eq(articles.id, articleId));
+ 
+     const job = await summarizeQueue.add("summarize", {
+       articleId,
+@@ -112,18 +95,12 @@ export async function POST(
+     });
+ 
+     if (!job) {
+-      return NextResponse.json(
+-        { error: "Failed to enqueue summarisation job" },
+-        { status: 502 },
+-      );
++      return NextResponse.json({ error: "Failed to enqueue summarisation job" }, { status: 502 });
+     }
+ 
+     return NextResponse.json({ jobId: job.id }, { status: 202 });
+   } catch (error) {
+     console.error("[summarize] Error:", error);
+-    return NextResponse.json(
+-      { error: "Internal server error" },
+-      { status: 500 },
+-    );
++    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+   }
+ }
+diff --git a/src/app/auth-error/AuthErrorMessage.tsx b/src/app/auth-error/AuthErrorMessage.tsx
+index d99c0f4..34220c5 100644
+--- a/src/app/auth-error/AuthErrorMessage.tsx
++++ b/src/app/auth-error/AuthErrorMessage.tsx
+@@ -39,8 +39,7 @@ export function AuthErrorMessage() {
+     return (
+       <p className="font-ui text-sm text-ink-600 mb-8 max-w-md mx-auto">
+         Access denied. You may not have permission to sign in, or your account
+-        has been disabled. Contact an administrator if you believe this is an
+-        error.
++        has been disabled. Contact an administrator if you believe this is an error.
+       </p>
+     );
+   }
+diff --git a/src/app/auth-error/page.test.tsx b/src/app/auth-error/page.test.tsx
+index db19416..6985ef2 100644
+--- a/src/app/auth-error/page.test.tsx
++++ b/src/app/auth-error/page.test.tsx
+@@ -39,7 +39,7 @@ describe("AuthErrorPage", () => {
+   it("renders the 'Sign-in failed' heading", () => {
+     render(<AuthErrorPage />);
+     expect(
+-      screen.getByRole("heading", { name: /sign-in failed/i }),
++      screen.getByRole("heading", { name: /sign-in failed/i })
+     ).toBeDefined();
+   });
+ 
+diff --git a/src/app/auth-error/page.tsx b/src/app/auth-error/page.tsx
+index 5aebb9d..ab2ba5e 100644
+--- a/src/app/auth-error/page.tsx
++++ b/src/app/auth-error/page.tsx
+@@ -30,10 +30,7 @@ export default function AuthErrorPage() {
+       <Suspense fallback={null}>
+         <Header />
+       </Suspense>
+-      <main
+-        id="main-content"
+-        className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-12"
+-      >
++      <main id="main-content" className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-12">
+         <div className="max-w-3xl mx-auto py-24 text-center">
+           <span
+             className="block w-1.5 h-1.5 rounded-full bg-dispatch-ember mx-auto mb-4"
+@@ -49,14 +46,11 @@ export default function AuthErrorPage() {
+               ?error= query param. AuthErrorMessage is a client component
+               that reads useSearchParams() — wrapped in Suspense because
+               useSearchParams requires a Suspense boundary in Next.js 16. */}
+-          <Suspense
+-            fallback={
+-              <p className="font-ui text-sm text-ink-600 mb-8 max-w-md mx-auto">
+-                Something went wrong during the sign-in process. Please try
+-                again.
+-              </p>
+-            }
+-          >
++          <Suspense fallback={
++            <p className="font-ui text-sm text-ink-600 mb-8 max-w-md mx-auto">
++              Something went wrong during the sign-in process. Please try again.
++            </p>
++          }>
+             <AuthErrorMessage />
+           </Suspense>
+           <Link
+diff --git a/src/app/error-boundaries.test.tsx b/src/app/error-boundaries.test.tsx
+index c908847..e35c775 100644
+--- a/src/app/error-boundaries.test.tsx
++++ b/src/app/error-boundaries.test.tsx
+@@ -34,12 +34,10 @@ describe("error.tsx — branded error boundary", () => {
+     expect(reset).toHaveBeenCalledTimes(1);
+   });
+ 
+-  it('includes <main id="main-content"> for skip-link target (WCAG AAA)', async () => {
++  it("includes <main id=\"main-content\"> for skip-link target (WCAG AAA)", async () => {
+     const { default: ErrorBoundary } = await import("./error");
+-    const { container } = render(
+-      <ErrorBoundary error={new Error("test")} reset={() => {}} />,
+-    );
+-    expect(container.querySelector("main#main-content")).toBeDefined();
++    const { container } = render(<ErrorBoundary error={new Error("test")} reset={() => {}} />);
++    expect(container.querySelector('main#main-content')).toBeDefined();
+   });
+ });
+ 
+@@ -48,15 +46,13 @@ describe("not-found.tsx — branded 404", () => {
+     const { default: NotFound } = await import("./not-found");
+     render(<NotFound />);
+     // The heading itself says "Page not found"
+-    expect(
+-      screen.getByRole("heading", { name: /page not found/i }),
+-    ).toBeDefined();
++    expect(screen.getByRole("heading", { name: /page not found/i })).toBeDefined();
+   });
+ 
+-  it('includes <main id="main-content"> for skip-link target', async () => {
++  it("includes <main id=\"main-content\"> for skip-link target", async () => {
+     const { default: NotFound } = await import("./not-found");
+     const { container } = render(<NotFound />);
+-    expect(container.querySelector("main#main-content")).toBeDefined();
++    expect(container.querySelector('main#main-content')).toBeDefined();
+   });
+ 
+   it("renders a link back to the homepage", async () => {
+@@ -70,9 +66,7 @@ describe("not-found.tsx — branded 404", () => {
+ describe("global-error.tsx — root layout error fallback", () => {
+   it("renders its own <html> and <body> (required for global-error)", async () => {
+     const { default: GlobalError } = await import("./global-error");
+-    const { container } = render(
+-      <GlobalError error={new Error("test")} reset={() => {}} />,
+-    );
++    const { container } = render(<GlobalError error={new Error("test")} reset={() => {}} />);
+     // global-error.tsx replaces the root layout when it throws, so it
+     // must render <html> and <body> itself.
+     expect(container.querySelector("html")).toBeDefined();
+@@ -82,9 +76,7 @@ describe("global-error.tsx — root layout error fallback", () => {
+   it("renders a heading and Try Again button", async () => {
+     const { default: GlobalError } = await import("./global-error");
+     render(<GlobalError error={new Error("test")} reset={() => {}} />);
+-    expect(
+-      screen.getByRole("heading", { name: /something went wrong/i }),
+-    ).toBeDefined();
++    expect(screen.getByRole("heading", { name: /something went wrong/i })).toBeDefined();
+     expect(screen.getByRole("button", { name: /try again/i })).toBeDefined();
+   });
+ });
+diff --git a/src/app/error.tsx b/src/app/error.tsx
+index 5de3bc7..0c6b35e 100644
+--- a/src/app/error.tsx
++++ b/src/app/error.tsx
+@@ -41,8 +41,8 @@ export default function ErrorBoundary({ error, reset }: ErrorBoundaryProps) {
+         Something went wrong
+       </h1>
+       <p className="font-ui text-sm text-ink-600 mb-8 max-w-md mx-auto">
+-        An unexpected error occurred while rendering this page. Please try again
+-        — if the problem persists, the issue has been logged.
++        An unexpected error occurred while rendering this page. Please try
++        again — if the problem persists, the issue has been logged.
+       </p>
+       <button
+         type="button"
+diff --git a/src/app/global-error.tsx b/src/app/global-error.tsx
+index 7e523af..efc2ab6 100644
+--- a/src/app/global-error.tsx
++++ b/src/app/global-error.tsx
+@@ -40,8 +40,8 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
+             Something went wrong
+           </h1>
+           <p className="font-ui text-sm text-ink-600 mb-8 max-w-md mx-auto">
+-            A critical error occurred while loading the application. Please try
+-            again — if the problem persists, the issue has been logged.
++            A critical error occurred while loading the application. Please
++            try again — if the problem persists, the issue has been logged.
+           </p>
+           <button
+             type="button"
+diff --git a/src/app/layout.tsx b/src/app/layout.tsx
+index 81c97ac..11b30b3 100644
+--- a/src/app/layout.tsx
++++ b/src/app/layout.tsx
+@@ -28,10 +28,7 @@ const commitMono = localFont({
+ });
+ 
+ export const metadata: Metadata = {
+-  title: {
+-    template: "%s — OneStopNews",
+-    default: "OneStopNews — Your Briefing Room",
+-  },
++  title: { template: "%s — OneStopNews", default: "OneStopNews — Your Briefing Room" },
+   description:
+     "Topic-first news aggregation with source-cited AI summaries. Every story, organized by what it's about — not who published it.",
+   metadataBase: new URL("http://localhost:3000"),
+@@ -41,11 +38,7 @@ export default function RootLayout({
+   children,
+ }: Readonly<{ children: React.ReactNode }>) {
+   return (
+-    <html
+-      lang="en"
+-      className={`${newsreader.variable} ${instrumentSans.variable} ${commitMono.variable}`}
+-      suppressHydrationWarning
+-    >
++    <html lang="en" className={`${newsreader.variable} ${instrumentSans.variable} ${commitMono.variable}`} suppressHydrationWarning>
+       <body className="bg-paper-50 text-ink-600 font-ui antialiased">
+         {/* Skip-to-content link — first focusable element for keyboard users (WCAG AAA).
+             Visually hidden by default via `sr-only`; becomes visible on focus via
+diff --git a/src/app/sign-in/page.tsx b/src/app/sign-in/page.tsx
+index e975887..5bf7f5f 100644
+--- a/src/app/sign-in/page.tsx
++++ b/src/app/sign-in/page.tsx
+@@ -22,8 +22,10 @@ import { SignInClient } from "./SignInClient";
+ import { env } from "@/lib/env";
+ 
+ export default function SignInPage() {
+-  const showGoogle = !!env.GOOGLE_CLIENT_ID && !!env.GOOGLE_CLIENT_SECRET;
+-  const showGithub = !!env.GITHUB_CLIENT_ID && !!env.GITHUB_CLIENT_SECRET;
++  const showGoogle =
++    !!env.GOOGLE_CLIENT_ID && !!env.GOOGLE_CLIENT_SECRET;
++  const showGithub =
++    !!env.GITHUB_CLIENT_ID && !!env.GITHUB_CLIENT_SECRET;
+ 
+   return <SignInClient showGoogle={showGoogle} showGithub={showGithub} />;
+ }
+diff --git a/src/features/articles/components/ArticleData.test.tsx b/src/features/articles/components/ArticleData.test.tsx
+index 9f0b7de..e7a56c5 100644
+--- a/src/features/articles/components/ArticleData.test.tsx
++++ b/src/features/articles/components/ArticleData.test.tsx
+@@ -24,13 +24,7 @@ vi.mock("@/shared/components/layout/Footer", () => ({
+ 
+ // Mock SummaryPanel (Client Component — uses useOptimistic)
+ vi.mock("@/features/summaries/components/SummaryPanel", () => ({
+-  SummaryPanel: ({
+-    initialStatus,
+-    summary,
+-  }: {
+-    initialStatus: string;
+-    summary?: unknown;
+-  }) => (
++  SummaryPanel: ({ initialStatus, summary }: { initialStatus: string; summary?: unknown }) => (
+     <div data-testid="summary-panel" data-status={initialStatus}>
+       {summary ? "Summary loaded" : "No summary"}
+     </div>
+@@ -116,9 +110,7 @@ describe("ArticleData", () => {
+     const result = await ArticleData({ params: mockParams("art-1") });
+     const { container } = render(result);
+ 
+-    expect(
+-      screen.getByText("Global Markets Rally as G7 Inflation Cools"),
+-    ).toBeDefined();
++    expect(screen.getByText("Global Markets Rally as G7 Inflation Cools")).toBeDefined();
+     expect(screen.getByText("Bloomberg")).toBeDefined();
+     expect(container.querySelector("time")).toBeDefined();
+   });
+@@ -139,23 +131,17 @@ describe("ArticleData", () => {
+     render(result);
+ 
+     expect(screen.getByTestId("summary-panel")).toBeDefined();
+-    expect(
+-      screen.getByTestId("summary-panel").getAttribute("data-status"),
+-    ).toBe("ok");
++    expect(screen.getByTestId("summary-panel").getAttribute("data-status")).toBe("ok");
+   });
+ 
+   it("renders SummaryPanel with 'none' status when no summary exists", async () => {
+-    vi.mocked(getArticleWithSummary).mockResolvedValue(
+-      mockArticleWithoutSummary,
+-    );
++    vi.mocked(getArticleWithSummary).mockResolvedValue(mockArticleWithoutSummary);
+ 
+     const result = await ArticleData({ params: mockParams("art-2") });
+     render(result);
+ 
+     expect(screen.getByTestId("summary-panel")).toBeDefined();
+-    expect(
+-      screen.getByTestId("summary-panel").getAttribute("data-status"),
+-    ).toBe("none");
++    expect(screen.getByTestId("summary-panel").getAttribute("data-status")).toBe("none");
+   });
+ 
+   it("renders 'not found' message when article is null", async () => {
+@@ -174,9 +160,7 @@ describe("ArticleData", () => {
+     render(result);
+ 
+     expect(screen.getByTestId("summary-panel")).toBeDefined();
+-    expect(
+-      screen.getByTestId("summary-panel").getAttribute("data-status"),
+-    ).toBe("needs_review");
++    expect(screen.getByTestId("summary-panel").getAttribute("data-status")).toBe("needs_review");
+   });
+ 
+   it("renders 'Back to Top Stories' link", async () => {
+@@ -216,7 +200,7 @@ describe("ArticleData", () => {
+     const { container } = render(result);
+ 
+     const jsonLdScript = container.querySelector(
+-      'script[type="application/ld+json"]',
++      'script[type="application/ld+json"]'
+     );
+     expect(jsonLdScript).not.toBeNull();
+ 
+@@ -228,24 +212,19 @@ describe("ArticleData", () => {
+     expect(parsed.accountablePerson.name).toBe("AI System: claude-haiku-4-5");
+     expect(parsed.additionalProperty).toEqual(
+       expect.arrayContaining([
+-        expect.objectContaining({
+-          name: "compliance",
+-          value: "eu-ai-act-art50",
+-        }),
+-      ]),
++        expect.objectContaining({ name: "compliance", value: "eu-ai-act-art50" }),
++      ])
+     );
+   });
+ 
+   it("does NOT render JSON-LD <script> tag when summary is missing", async () => {
+-    vi.mocked(getArticleWithSummary).mockResolvedValue(
+-      mockArticleWithoutSummary,
+-    );
++    vi.mocked(getArticleWithSummary).mockResolvedValue(mockArticleWithoutSummary);
+ 
+     const result = await ArticleData({ params: mockParams("art-2") });
+     const { container } = render(result);
+ 
+     const jsonLdScript = container.querySelector(
+-      'script[type="application/ld+json"]',
++      'script[type="application/ld+json"]'
+     );
+     expect(jsonLdScript).toBeNull();
+   });
+@@ -257,7 +236,7 @@ describe("ArticleData", () => {
+     const { container } = render(result);
+ 
+     const jsonLdScript = container.querySelector(
+-      'script[type="application/ld+json"]',
++      'script[type="application/ld+json"]'
+     );
+     expect(jsonLdScript).toBeNull();
+   });
+diff --git a/src/features/feed/components/FeedContainer.test.tsx b/src/features/feed/components/FeedContainer.test.tsx
+index 4f33b4c..1b1fd29 100644
+--- a/src/features/feed/components/FeedContainer.test.tsx
++++ b/src/features/feed/components/FeedContainer.test.tsx
+@@ -62,7 +62,7 @@ describe("FeedContainer", () => {
+         initialArticles={initialArticles}
+         initialNextCursor={null}
+         initialHasMore={false}
+-      />,
++      />
+     );
+     expect(screen.getByText("First Article")).toBeDefined();
+     expect(screen.getByText("Second Article")).toBeDefined();
+@@ -74,7 +74,7 @@ describe("FeedContainer", () => {
+         initialArticles={initialArticles}
+         initialNextCursor={null}
+         initialHasMore={false}
+-      />,
++      />
+     );
+     expect(screen.queryByRole("button", { name: /load more/i })).toBeNull();
+   });
+@@ -85,7 +85,7 @@ describe("FeedContainer", () => {
+         initialArticles={initialArticles}
+         initialNextCursor="2024-06-01T00:00:00.000Z"
+         initialHasMore={true}
+-      />,
++      />
+     );
+     expect(screen.getByRole("button", { name: /load more/i })).toBeDefined();
+   });
+@@ -105,7 +105,7 @@ describe("FeedContainer", () => {
+         initialArticles={initialArticles}
+         initialNextCursor="2024-06-01T00:00:00.000Z"
+         initialHasMore={true}
+-      />,
++      />
+     );
+ 
+     fireEvent.click(screen.getByRole("button", { name: /load more/i }));
+@@ -140,7 +140,7 @@ describe("FeedContainer", () => {
+         initialArticles={initialArticles}
+         initialNextCursor="2024-06-01T00:00:00.000Z"
+         initialHasMore={true}
+-      />,
++      />
+     );
+ 
+     fireEvent.click(screen.getByRole("button", { name: /load more/i }));
+@@ -162,7 +162,7 @@ describe("FeedContainer", () => {
+         initialArticles={initialArticles}
+         initialNextCursor="2024-06-01T00:00:00.000Z"
+         initialHasMore={true}
+-      />,
++      />
+     );
+ 
+     const button = screen.getByRole("button", { name: /load more/i });
+@@ -181,7 +181,7 @@ describe("FeedContainer", () => {
+         initialArticles={initialArticles}
+         initialNextCursor="2024-06-01T00:00:00.000Z"
+         initialHasMore={true}
+-      />,
++      />
+     );
+ 
+     fireEvent.click(screen.getByRole("button", { name: /load more/i }));
+@@ -208,7 +208,7 @@ describe("FeedContainer", () => {
+         initialArticles={initialArticles}
+         initialNextCursor="2024-06-01T00:00:00.000Z"
+         initialHasMore={true}
+-      />,
++      />
+     );
+ 
+     // First click fails
+diff --git a/src/features/search/components/SearchResults.tsx b/src/features/search/components/SearchResults.tsx
+index 7642478..cbf5c42 100644
+--- a/src/features/search/components/SearchResults.tsx
++++ b/src/features/search/components/SearchResults.tsx
+@@ -24,13 +24,7 @@ interface SearchResultsProps {
+   onRetry?: () => void;
+ }
+ 
+-export function SearchResults({
+-  results,
+-  query,
+-  isLoading = false,
+-  error = null,
+-  onRetry,
+-}: SearchResultsProps) {
++export function SearchResults({ results, query, isLoading = false, error = null, onRetry }: SearchResultsProps) {
+   // Error state takes precedence over loading and empty — show the user
+   // that the search failed and offer a retry, rather than silently
+   // rendering the stale "no results" UI.
+@@ -41,10 +35,7 @@ export function SearchResults({
+         role="alert"
+         aria-live="polite"
+       >
+-        <span
+-          className="block w-1.5 h-1.5 rounded-full bg-dispatch-ember"
+-          aria-hidden="true"
+-        />
++        <span className="block w-1.5 h-1.5 rounded-full bg-dispatch-ember" aria-hidden="true" />
+         <p className="font-mono text-[11px] uppercase tracking-widest text-ink-300">
+           Search failed
+         </p>
+@@ -79,10 +70,7 @@ export function SearchResults({
+   if (results.length === 0 && query) {
+     return (
+       <div className="py-24 flex flex-col items-center gap-3">
+-        <span
+-          className="block w-1.5 h-1.5 rounded-full bg-dispatch-ember"
+-          aria-hidden="true"
+-        />
++        <span className="block w-1.5 h-1.5 rounded-full bg-dispatch-ember" aria-hidden="true" />
+         <p className="font-mono text-[11px] uppercase tracking-widest text-ink-300">
+           No results for &quot;{query}&quot;
+         </p>
+diff --git a/src/features/search/queries.ts b/src/features/search/queries.ts
+index 04a62d5..864589a 100644
+--- a/src/features/search/queries.ts
++++ b/src/features/search/queries.ts
+@@ -34,9 +34,7 @@ const SEARCH_PAGE_SIZE = 31;
+  * Uses PostgreSQL native FTS via Drizzle sql template literal.
+  * ts_rank_cd weights: title(A) = 1.0, excerpt(B) = 0.4
+  */
+-export async function searchArticles(
+-  params: SearchParams,
+-): Promise<SearchPage> {
++export async function searchArticles(params: SearchParams): Promise<SearchPage> {
+   // Phase 19 (M4): Cache search results at the reference profile (1h stale,
+   // 1d revalidate, 7d expire). Repeat searches within the window are served
+   // from cache, dramatically reducing FTS query load on the DB.
+@@ -53,7 +51,7 @@ export async function searchArticles(
+ 
+   const whereClause = and(
+     sql`${articles.searchVector} @@ ${tsQuery}`,
+-    cursor ? sql`${articles.publishedAt} < ${cursor}` : undefined,
++    cursor ? sql`${articles.publishedAt} < ${cursor}` : undefined
+   );
+ 
+   const rows = await db
+@@ -96,7 +94,7 @@ export async function searchArticles(
+   }));
+ 
+   const nextCursor = hasMore
+-    ? (resultRows[resultRows.length - 1]?.publishedAt.toISOString() ?? null)
++    ? resultRows[resultRows.length - 1]?.publishedAt.toISOString() ?? null
+     : null;
+ 
+   return { results, nextCursor, hasMore };
+diff --git a/src/features/sources/components/SourcesData.tsx b/src/features/sources/components/SourcesData.tsx
+index 5272ab9..da8febe 100644
+--- a/src/features/sources/components/SourcesData.tsx
++++ b/src/features/sources/components/SourcesData.tsx
+@@ -20,59 +20,31 @@ interface SourceRow {
+   failureCount: number;
+ }
+ 
+-function SourceTable({
+-  sources,
+-  categoryMap,
+-}: {
+-  sources: SourceRow[];
+-  categoryMap: Record<string, string>;
+-}) {
++function SourceTable({ sources, categoryMap }: { sources: SourceRow[]; categoryMap: Record<string, string> }) {
+   return (
+     <table className="w-full text-left">
+       <thead>
+         <tr className="border-b border-ink-700">
+-          <th className="py-3 px-4 font-mono text-[10px] uppercase tracking-widest text-paper-400">
+-            Name
+-          </th>
+-          <th className="py-3 px-4 font-mono text-[10px] uppercase tracking-widest text-paper-400">
+-            Feed URL
+-          </th>
+-          <th className="py-3 px-4 font-mono text-[10px] uppercase tracking-widest text-paper-400">
+-            Category
+-          </th>
+-          <th className="py-3 px-4 font-mono text-[10px] uppercase tracking-widest text-paper-400">
+-            Status
+-          </th>
+-          <th className="py-3 px-4 font-mono text-[10px] uppercase tracking-widest text-paper-400">
+-            Failures
+-          </th>
++          <th className="py-3 px-4 font-mono text-[10px] uppercase tracking-widest text-paper-400">Name</th>
++          <th className="py-3 px-4 font-mono text-[10px] uppercase tracking-widest text-paper-400">Feed URL</th>
++          <th className="py-3 px-4 font-mono text-[10px] uppercase tracking-widest text-paper-400">Category</th>
++          <th className="py-3 px-4 font-mono text-[10px] uppercase tracking-widest text-paper-400">Status</th>
++          <th className="py-3 px-4 font-mono text-[10px] uppercase tracking-widest text-paper-400">Failures</th>
+         </tr>
+       </thead>
+       <tbody>
+         {sources.map((source) => (
+           <tr key={source.id} className="border-b border-ink-800">
+-            <td className="py-3 px-4 font-ui text-sm text-paper-200">
+-              {source.name}
+-            </td>
+-            <td className="py-3 px-4 font-ui text-sm text-paper-400 truncate max-w-xs">
+-              {source.feedUrl}
+-            </td>
+-            <td className="py-3 px-4 font-ui text-sm text-paper-400">
+-              {source.categoryId ? categoryMap[source.categoryId] || "—" : "—"}
+-            </td>
++            <td className="py-3 px-4 font-ui text-sm text-paper-200">{source.name}</td>
++            <td className="py-3 px-4 font-ui text-sm text-paper-400 truncate max-w-xs">{source.feedUrl}</td>
++            <td className="py-3 px-4 font-ui text-sm text-paper-400">{source.categoryId ? categoryMap[source.categoryId] || "—" : "—"}</td>
+             <td className="py-3 px-4">
+-              <span
+-                className={`inline-flex items-center gap-1.5 px-2 py-1 font-mono text-[10px] uppercase ${source.isActive ? "bg-dispatch-sage/20 text-dispatch-sage" : "bg-dispatch-ember/20 text-dispatch-ember"}`}
+-              >
+-                <span
+-                  className={`w-1.5 h-1.5 rounded-full ${source.isActive ? "bg-dispatch-sage" : "bg-dispatch-ember"}`}
+-                />
++              <span className={`inline-flex items-center gap-1.5 px-2 py-1 font-mono text-[10px] uppercase ${source.isActive ? "bg-dispatch-sage/20 text-dispatch-sage" : "bg-dispatch-ember/20 text-dispatch-ember"}`}>
++                <span className={`w-1.5 h-1.5 rounded-full ${source.isActive ? "bg-dispatch-sage" : "bg-dispatch-ember"}`} />
+                 {source.isActive ? "Active" : "Paused"}
+               </span>
+             </td>
+-            <td className="py-3 px-4 font-mono text-sm text-paper-400">
+-              {source.failureCount}
+-            </td>
++            <td className="py-3 px-4 font-mono text-sm text-paper-400">{source.failureCount}</td>
+           </tr>
+         ))}
+       </tbody>
+diff --git a/src/features/sources/queries.ts b/src/features/sources/queries.ts
+index 22f43f6..2408290 100644
+--- a/src/features/sources/queries.ts
++++ b/src/features/sources/queries.ts
+@@ -55,7 +55,7 @@ export async function getAllSources(): Promise<SourceRow[]> {
+  */
+ export async function getAllSourcesPaginated(
+   cursor?: string | null,
+-  limit: number = 50,
++  limit: number = 50
+ ): Promise<PaginatedSources> {
+   cacheLife("feed");
+ 
+@@ -72,10 +72,9 @@ export async function getAllSourcesPaginated(
+ 
+   const hasMore = rows.length > limit;
+   const sliced = hasMore ? rows.slice(0, limit) : rows;
+-  const nextCursor =
+-    hasMore && sliced.length > 0
+-      ? sliced[sliced.length - 1]!.createdAt.toISOString()
+-      : null;
++  const nextCursor = hasMore && sliced.length > 0
++    ? sliced[sliced.length - 1]!.createdAt.toISOString()
++    : null;
+ 
+   return {
+     sources: sliced,
+@@ -86,9 +85,7 @@ export async function getAllSourcesPaginated(
+ 
+ export async function getCategoryMap(): Promise<CategoryMap> {
+   cacheLife("feed");
+-  const rows = await db
+-    .select({ id: categories.id, name: categories.name })
+-    .from(categories);
++  const rows = await db.select({ id: categories.id, name: categories.name }).from(categories);
+   const map: CategoryMap = {};
+   for (const row of rows) {
+     map[row.id] = row.name;
+diff --git a/src/features/summaries/actions.test.ts b/src/features/summaries/actions.test.ts
+index d5e917e..9799f9e 100644
+--- a/src/features/summaries/actions.test.ts
++++ b/src/features/summaries/actions.test.ts
+@@ -55,8 +55,7 @@ vi.mock("next/cache", () => ({
+ }));
+ 
+ // Import after mocks are registered.
+-const { requestSummary, flagSummary, disableSummary } =
+-  await import("./actions");
++const { requestSummary, flagSummary, disableSummary } = await import("./actions");
+ const { checkRateLimit } = await import("@/lib/rateLimit");
+ 
+ // ── Helpers ─────────────────────────────────────────────────────────────────
+@@ -64,19 +63,13 @@ const { checkRateLimit } = await import("@/lib/rateLimit");
+ const VALID_ARTICLE_ID = "550e8400-e29b-41d4-a716-446655440000";
+ const VALID_SUMMARY_ID = "660e8400-e29b-41d4-a716-446655440001";
+ 
+-function mockArticle(
+-  overrides: Partial<{
+-    id: string;
+-    contentAvailability:
+-      | "title_only"
+-      | "excerpt"
+-      | "partial_text"
+-      | "full_text";
+-    summaryStatus: "none" | "pending" | "ok" | "needs_review" | "disabled";
+-    excerpt: string;
+-    title: string;
+-  }> = {},
+-) {
++function mockArticle(overrides: Partial<{
++  id: string;
++  contentAvailability: "title_only" | "excerpt" | "partial_text" | "full_text";
++  summaryStatus: "none" | "pending" | "ok" | "needs_review" | "disabled";
++  excerpt: string;
++  title: string;
++}> = {}) {
+   return {
+     id: VALID_ARTICLE_ID,
+     contentAvailability: "partial_text" as const,
+@@ -89,9 +82,7 @@ function mockArticle(
+ 
+ beforeEach(() => {
+   vi.clearAllMocks();
+-  mockVerifySession.mockResolvedValue({
+-    user: { id: "user-1", role: "reader" },
+-  });
++  mockVerifySession.mockResolvedValue({ user: { id: "user-1", role: "reader" } });
+   mockVerifyAdminSession.mockResolvedValue(undefined);
+   vi.mocked(checkRateLimit).mockResolvedValue({
+     allowed: true,
+@@ -129,9 +120,7 @@ describe("requestSummary — auth (Critical C3)", () => {
+       return mockArticle();
+     });
+     await requestSummary(VALID_ARTICLE_ID);
+-    expect(callOrder.indexOf("verifySession")).toBeLessThan(
+-      callOrder.indexOf("findFirst"),
+-    );
++    expect(callOrder.indexOf("verifySession")).toBeLessThan(callOrder.indexOf("findFirst"));
+   });
+ });
+ 
+@@ -141,7 +130,7 @@ describe("requestSummary — rate limiting (Critical C3)", () => {
+     expect(checkRateLimit).toHaveBeenCalledWith(
+       expect.stringContaining("api:summarize:user-1"),
+       expect.any(Number),
+-      expect.any(Number),
++      expect.any(Number)
+     );
+   });
+ 
+@@ -161,9 +150,7 @@ describe("requestSummary — rate limiting (Critical C3)", () => {
+ 
+ describe("requestSummary — content guard + idempotency", () => {
+   it("rejects title_only content", async () => {
+-    mockFindFirst.mockResolvedValue(
+-      mockArticle({ contentAvailability: "title_only" }),
+-    );
++    mockFindFirst.mockResolvedValue(mockArticle({ contentAvailability: "title_only" }));
+     const result = await requestSummary(VALID_ARTICLE_ID);
+     expect(result.success).toBe(false);
+     expect(result.error).toMatch(/title_only/);
+diff --git a/src/features/summaries/actions.ts b/src/features/summaries/actions.ts
+index 1e439eb..184672c 100644
+--- a/src/features/summaries/actions.ts
++++ b/src/features/summaries/actions.ts
+@@ -45,9 +45,7 @@ const SUMMARIZE_RATE_LIMIT_WINDOW_SEC = 60;
+  *   - partial_text → ALLOWED
+  *   - full_text → ALLOWED
+  */
+-export async function requestSummary(
+-  articleId: string,
+-): Promise<SummariseResponse> {
++export async function requestSummary(articleId: string): Promise<SummariseResponse> {
+   // ── Auth: every Server Action must verify the session ──────────────────
+   // Phase 19 (Critical C3): this was missing. The HTTP route had it; the
+   // Server Action did not. Any client could import this action and trigger
+@@ -64,7 +62,7 @@ export async function requestSummary(
+   const rateLimitResult = await checkRateLimit(
+     `api:summarize:${session.user.id}`,
+     SUMMARIZE_RATE_LIMIT_MAX,
+-    SUMMARIZE_RATE_LIMIT_WINDOW_SEC,
++    SUMMARIZE_RATE_LIMIT_WINDOW_SEC
+   );
+   if (!rateLimitResult.allowed) {
+     return {
+@@ -75,8 +73,7 @@ export async function requestSummary(
+   }
+ 
+   // Validate UUID
+-  const uuidRegex =
+-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
++  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+   if (!uuidRegex.test(articleId)) {
+     return { success: false, jobId: null, error: "Invalid article ID format" };
+   }
+@@ -91,10 +88,7 @@ export async function requestSummary(
+   }
+ 
+   // Content availability guard (anti-hallucination)
+-  if (
+-    article.contentAvailability === "title_only" ||
+-    article.contentAvailability === "excerpt"
+-  ) {
++  if (article.contentAvailability === "title_only" || article.contentAvailability === "excerpt") {
+     return {
+       success: false,
+       jobId: null,
+@@ -107,7 +101,7 @@ export async function requestSummary(
+     return {
+       success: false,
+       jobId: null,
+-      error: `Summary already exists with status: ${article.summaryStatus}`,
++      error: `Summary already exists with status: ${article.summaryStatus}`
+     };
+   }
+ 
+@@ -124,11 +118,7 @@ export async function requestSummary(
+   });
+ 
+   if (!job) {
+-    return {
+-      success: false,
+-      jobId: null,
+-      error: "Failed to enqueue summarisation job",
+-    };
++    return { success: false, jobId: null, error: "Failed to enqueue summarisation job" };
+   }
+ 
+   return { success: true, jobId: job!.id!, error: null };
+@@ -139,7 +129,7 @@ export async function requestSummary(
+  */
+ export async function flagSummary(
+   summaryId: string,
+-  flagReason: string,
++  flagReason: string
+ ): Promise<{ success: boolean; error: string | null }> {
+   try {
+     await verifyAdminSession();
+@@ -149,7 +139,8 @@ export async function flagSummary(
+       .set({
+         status: "needs_review",
+         flagReason,
+-      })
++      }
++      )
+       .where(eq(summaries.id, summaryId));
+ 
+     revalidatePath("/admin/summaries");
+@@ -164,7 +155,7 @@ export async function flagSummary(
+  * Permanently disables a summary from appearing in the UI.
+  */
+ export async function disableSummary(
+-  summaryId: string,
++  summaryId: string
+ ): Promise<{ success: boolean; error: string | null }> {
+   try {
+     await verifyAdminSession();
+@@ -190,7 +181,7 @@ export async function disableSummary(
+  * real admin-guarded mutation.
+  */
+ export async function approveSummary(
+-  summaryId: string,
++  summaryId: string
+ ): Promise<{ success: boolean; error: string | null }> {
+   try {
+     await verifyAdminSession();
+diff --git a/src/features/summaries/components/SummariesData.tsx b/src/features/summaries/components/SummariesData.tsx
+index d9df199..36f56d2 100644
+--- a/src/features/summaries/components/SummariesData.tsx
++++ b/src/features/summaries/components/SummariesData.tsx
+@@ -77,11 +77,7 @@ export async function SummariesData() {
+                     pre-fills the articleId argument. revalidatePath inside
+                     each action refreshes the table after the mutation lands.
+                   */}
+-                  <form
+-                    action={async () => {
+-                      await approveSummary(summary.id);
+-                    }}
+-                  >
++                  <form action={async () => { await approveSummary(summary.id); }}>
+                     <button
+                       type="submit"
+                       className="px-3 py-1 text-xs font-medium bg-dispatch-sage/20 text-dispatch-sage hover:bg-dispatch-sage/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dispatch-ember focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
+@@ -89,11 +85,7 @@ export async function SummariesData() {
+                       Approve
+                     </button>
+                   </form>
+-                  <form
+-                    action={async () => {
+-                      await disableSummary(summary.id);
+-                    }}
+-                  >
++                  <form action={async () => { await disableSummary(summary.id); }}>
+                     <button
+                       type="submit"
+                       className="px-3 py-1 text-xs font-medium bg-dispatch-ember/20 text-dispatch-ember hover:bg-dispatch-ember/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dispatch-ember focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
+diff --git a/src/features/summaries/components/SummaryPanel.test.tsx b/src/features/summaries/components/SummaryPanel.test.tsx
+index cd02447..87751fa 100644
+--- a/src/features/summaries/components/SummaryPanel.test.tsx
++++ b/src/features/summaries/components/SummaryPanel.test.tsx
+@@ -13,16 +13,8 @@ const mockSummary = {
+ 
+ describe("SummaryPanel", () => {
+   it("renders 'Request AI Summary' button for none status", () => {
+-    render(
+-      <SummaryPanel
+-        articleId="123"
+-        initialStatus="none"
+-        onRequestSummary={vi.fn()}
+-      />,
+-    );
+-    expect(
+-      screen.getByText("No AI summary is available for this article yet."),
+-    ).toBeDefined();
++    render(<SummaryPanel articleId="123" initialStatus="none" onRequestSummary={vi.fn()} />);
++    expect(screen.getByText("No AI summary is available for this article yet.")).toBeDefined();
+     expect(screen.getByText("Request AI Summary")).toBeDefined();
+   });
+ 
+@@ -32,9 +24,7 @@ describe("SummaryPanel", () => {
+   });
+ 
+   it("renders NutritionLabel for ok status with summary", () => {
+-    render(
+-      <SummaryPanel articleId="123" initialStatus="ok" summary={mockSummary} />,
+-    );
++    render(<SummaryPanel articleId="123" initialStatus="ok" summary={mockSummary} />);
+     expect(screen.getByText(mockSummary.summaryText)).toBeDefined();
+   });
+ 
+@@ -44,21 +34,13 @@ describe("SummaryPanel", () => {
+   });
+ 
+   it("renders null for disabled status", () => {
+-    const { container } = render(
+-      <SummaryPanel articleId="123" initialStatus="disabled" />,
+-    );
++    const { container } = render(<SummaryPanel articleId="123" initialStatus="disabled" />);
+     expect(container.firstChild).toBeNull();
+   });
+ 
+   it("calls onRequestSummary when button clicked", () => {
+     const handleRequest = vi.fn();
+-    render(
+-      <SummaryPanel
+-        articleId="123"
+-        initialStatus="none"
+-        onRequestSummary={handleRequest}
+-      />,
+-    );
++    render(<SummaryPanel articleId="123" initialStatus="none" onRequestSummary={handleRequest} />);
+     fireEvent.click(screen.getByText("Request AI Summary"));
+     expect(handleRequest).toHaveBeenCalledTimes(1);
+   });
+@@ -82,7 +64,7 @@ describe("SummaryPanel — error state (Phase 19 / H4)", () => {
+         initialStatus="none"
+         onRequestSummary={vi.fn()}
+         onError={vi.fn()}
+-      />,
++      />
+     );
+     expect(screen.getByText("Request AI Summary")).toBeDefined();
+   });
+@@ -98,7 +80,7 @@ describe("SummaryPanel — error state (Phase 19 / H4)", () => {
+         initialStatus="none"
+         onRequestSummary={vi.fn()}
+         error="Failed to generate summary. Please try again."
+-      />,
++      />
+     );
+     expect(screen.getByText(/failed to generate summary/i)).toBeDefined();
+     expect(screen.getByRole("button", { name: /try again/i })).toBeDefined();
+@@ -112,7 +94,7 @@ describe("SummaryPanel — error state (Phase 19 / H4)", () => {
+         initialStatus="none"
+         onRequestSummary={handleRequest}
+         error="Failed to generate summary. Please try again."
+-      />,
++      />
+     );
+     fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+     expect(handleRequest).toHaveBeenCalledTimes(1);
+diff --git a/src/features/summaries/components/SummaryPanel.tsx b/src/features/summaries/components/SummaryPanel.tsx
+index a8f82b4..048ae04 100644
+--- a/src/features/summaries/components/SummaryPanel.tsx
++++ b/src/features/summaries/components/SummaryPanel.tsx
+@@ -57,7 +57,7 @@ export function SummaryPanel({
+ }: SummaryPanelProps) {
+   const [optimisticStatus, setOptimisticStatus] = useOptimistic(
+     initialStatus,
+-    (_state, newStatus: SummaryStatus) => newStatus,
++    (_state, newStatus: SummaryStatus) => newStatus
+   );
+ 
+   // Error state takes precedence — surfaces failures from the parent
+@@ -72,15 +72,14 @@ export function SummaryPanel({
+         aria-live="polite"
+       >
+         <div className="flex items-center gap-2 mb-4">
+-          <span
+-            className="h-2 w-2 rounded-full bg-dispatch-ember"
+-            aria-hidden="true"
+-          />
++          <span className="h-2 w-2 rounded-full bg-dispatch-ember" aria-hidden="true" />
+           <span className="font-mono text-[10px] uppercase tracking-widest text-ink-300">
+             AI Summary Error
+           </span>
+         </div>
+-        <p className="font-ui text-ink-600 mb-4">{error}</p>
++        <p className="font-ui text-ink-600 mb-4">
++          {error}
++        </p>
+         {onRequestSummary && (
+           <button
+             type="button"
+@@ -104,15 +103,9 @@ export function SummaryPanel({
+ 
+     case "none":
+       return (
+-        <div
+-          id="ai-summary"
+-          className="my-8 border-l-2 border-dispatch-ember bg-paper-100/50 p-6"
+-        >
++        <div id="ai-summary" className="my-8 border-l-2 border-dispatch-ember bg-paper-100/50 p-6">
+           <div className="flex items-center gap-2 mb-4">
+-            <span
+-              className="h-2 w-2 rounded-full bg-dispatch-ember"
+-              aria-hidden="true"
+-            />
++            <span className="h-2 w-2 rounded-full bg-dispatch-ember" aria-hidden="true" />
+             <span className="font-mono text-[10px] uppercase tracking-widest text-ink-300">
+               AI Summary
+             </span>
+@@ -138,15 +131,9 @@ export function SummaryPanel({
+ 
+     case "pending":
+       return (
+-        <div
+-          id="ai-summary"
+-          className="my-8 border-l-2 border-ink-300 bg-paper-100/50 p-6"
+-        >
++        <div id="ai-summary" className="my-8 border-l-2 border-ink-300 bg-paper-100/50 p-6">
+           <div className="flex items-center gap-2">
+-            <span
+-              className="h-2 w-2 rounded-full bg-ink-300 animate-pulse"
+-              aria-hidden="true"
+-            />
++            <span className="h-2 w-2 rounded-full bg-ink-300 animate-pulse" aria-hidden="true" />
+             <span className="font-mono font-ui text-ink-600">
+               Generating AI summary...
+             </span>
+@@ -163,17 +150,14 @@ export function SummaryPanel({
+           className="my-8 border-l-2 border-dispatch-warning bg-dispatch-warning-light p-6"
+         >
+           <div className="flex items-center gap-2">
+-            <span
+-              className="h-2 w-2 rounded-full bg-dispatch-warning"
+-              aria-hidden="true"
+-            />
++            <span className="h-2 w-2 rounded-full bg-dispatch-warning" aria-hidden="true" />
+             <span className="font-mono font-ui text-dispatch-warning">
+               Summary under editorial review
+             </span>
+           </div>
+           <p className="mt-2 font-ui text-sm text-dispatch-warning">
+-            This summary has been flagged for review by our editorial team. It
+-            will be re-examined shortly.
++            This summary has been flagged for review by our editorial team.
++            It will be re-examined shortly.
+           </p>
+         </div>
+       );
+@@ -183,8 +167,7 @@ export function SummaryPanel({
+         return (
+           <div className="my-8 border-l-2 border-ink-300 bg-paper-100/50 p-6">
+             <p className="font-ui text-ink-600">
+-              Summary status is marked as complete, but no summary data is
+-              available.
++              Summary status is marked as complete, but no summary data is available.
+             </p>
+           </div>
+         );
+diff --git a/src/lib/auth/providers.test.ts b/src/lib/auth/providers.test.ts
+index f0fd980..4ab817f 100644
+--- a/src/lib/auth/providers.test.ts
++++ b/src/lib/auth/providers.test.ts
+@@ -32,11 +32,7 @@ vi.mock("@/lib/env", () => ({
+ // query Postgres during these unit tests.
+ vi.mock("@/lib/db", () => ({
+   db: {
+-    select: vi.fn(() => ({
+-      from: vi.fn(() => ({
+-        where: vi.fn(() => ({ limit: vi.fn(() => Promise.resolve([])) })),
+-      })),
+-    })),
++    select: vi.fn(() => ({ from: vi.fn(() => ({ where: vi.fn(() => ({ limit: vi.fn(() => Promise.resolve([])) })) })) })),
+   },
+ }));
+ 
+diff --git a/src/lib/auth/providers.ts b/src/lib/auth/providers.ts
+index e17fd84..f11b5f5 100644
+--- a/src/lib/auth/providers.ts
++++ b/src/lib/auth/providers.ts
+@@ -101,7 +101,7 @@ export function buildProviders(): Provider[] {
+       Google({
+         clientId: env.GOOGLE_CLIENT_ID,
+         clientSecret: env.GOOGLE_CLIENT_SECRET,
+-      }),
++      })
+     );
+   }
+ 
+@@ -111,7 +111,7 @@ export function buildProviders(): Provider[] {
+       GitHub({
+         clientId: env.GITHUB_CLIENT_ID,
+         clientSecret: env.GITHUB_CLIENT_SECRET,
+-      }),
++      })
+     );
+   }
+ 
+diff --git a/src/lib/db/index.test.ts b/src/lib/db/index.test.ts
+index ad666c2..7f75fbf 100644
+--- a/src/lib/db/index.test.ts
++++ b/src/lib/db/index.test.ts
+@@ -39,15 +39,13 @@ describe("db connection", () => {
+   beforeEach(() => {
+     vi.resetModules();
+     // Reset to default valid state.
+-    mockEnv.DATABASE_URL =
+-      "postgresql://testuser:testpass@localhost:5432/testdb";
++    mockEnv.DATABASE_URL = "postgresql://testuser:testpass@localhost:5432/testdb";
+     mockEnv.NODE_ENV = "test";
+   });
+ 
+   afterEach(() => {
+     // Restore default valid state.
+-    mockEnv.DATABASE_URL =
+-      "postgresql://testuser:testpass@localhost:5432/testdb";
++    mockEnv.DATABASE_URL = "postgresql://testuser:testpass@localhost:5432/testdb";
+   });
+ 
+   it("should export a db object (not undefined or null)", async () => {
+diff --git a/src/lib/db/schema.ts b/src/lib/db/schema.ts
+index cc45115..6f5075b 100644
+--- a/src/lib/db/schema.ts
++++ b/src/lib/db/schema.ts
+@@ -27,11 +27,7 @@ export const tsvector = customType<{ data: string }>({
+ 
+ // ─── Enums ────────────────────────────────────────────────────────────────
+ export const userRoleEnum = pgEnum("user_role", ["reader", "admin"]);
+-export const feedFormatEnum = pgEnum("feed_format", [
+-  "rss",
+-  "atom",
+-  "json_api",
+-]);
++export const feedFormatEnum = pgEnum("feed_format", ["rss", "atom", "json_api"]);
+ 
+ /**
+  * contentAvailabilityEnum — Controls whether an article is eligible for AI summarisation.
+@@ -98,9 +94,9 @@ export const subcategories = pgTable(
+   (table) => ({
+     categorySlugIdx: uniqueIndex("subcategories_category_slug_idx").on(
+       table.categoryId,
+-      table.slug,
++      table.slug
+     ),
+-  }),
++  })
+ );
+ 
+ export const sources = pgTable("sources", {
+@@ -159,9 +155,7 @@ export const articles = pgTable(
+       .notNull(),
+     importanceScore: real("importance_score").default(0.5).notNull(),
+     hasSummary: boolean("has_summary").default(false).notNull(),
+-    summaryStatus: summaryStatusEnum("summary_status")
+-      .default("none")
+-      .notNull(),
++    summaryStatus: summaryStatusEnum("summary_status").default("none").notNull(),
+     politicalLeaning: text("political_leaning"),
+     publishedAt: timestamp("published_at").notNull(),
+     ingestedAt: timestamp("ingested_at").defaultNow().notNull(),
+@@ -185,27 +179,25 @@ export const articles = pgTable(
+           setweight(to_tsvector('english', coalesce(excerpt, '')), 'B') ||
+           setweight(to_tsvector('english', coalesce(body, '')), 'C') ||
+           setweight(to_tsvector('english', coalesce(source_name, '')), 'D')
+-        `,
++        `
+       )
+       .notNull(),
+   },
+   (table) => ({
+-    canonicalUrlIdx: uniqueIndex("articles_canonical_url_idx").on(
+-      table.canonicalUrl,
+-    ),
++    canonicalUrlIdx: uniqueIndex("articles_canonical_url_idx").on(table.canonicalUrl),
+     categoryPublishedIdx: index("articles_category_published_idx").on(
+       table.categoryId,
+-      table.publishedAt,
++      table.publishedAt
+     ),
+     subcategoryPublishedIdx: index("articles_subcategory_published_idx").on(
+       table.subcategoryId,
+-      table.publishedAt,
++      table.publishedAt
+     ),
+     searchVectorIdx: index("articles_search_vector_gin_idx").using(
+       "gin",
+-      table.searchVector,
++      table.searchVector
+     ),
+-  }),
++  })
+ );
+ 
+ export const summaries = pgTable("summaries", {
+@@ -257,16 +249,10 @@ export const userPreferences = pgTable("user_preferences", {
+     .references(() => users.id, { onDelete: "cascade" })
+     .notNull()
+     .unique(),
+-  favoriteCategories: jsonb("favorite_categories")
+-    .$type<string[]>()
+-    .default([])
+-    .notNull(),
++  favoriteCategories: jsonb("favorite_categories").$type<string[]>().default([]).notNull(),
+   mutedSources: jsonb("muted_sources").$type<string[]>().default([]).notNull(),
+   pushEnabled: boolean("push_enabled").default(false).notNull(),
+-  pushCategories: jsonb("push_categories")
+-    .$type<string[]>()
+-    .default([])
+-    .notNull(),
++  pushCategories: jsonb("push_categories").$type<string[]>().default([]).notNull(),
+   pushQuietStart: time("push_quiet_start"),
+   pushQuietEnd: time("push_quiet_end"),
+   pushMaxPerDay: integer("push_max_per_day").default(10).notNull(),
+@@ -298,9 +284,9 @@ export const accounts = pgTable(
+   (table) => ({
+     providerAccountIdx: uniqueIndex("accounts_provider_account_idx").on(
+       table.provider,
+-      table.providerAccountId,
++      table.providerAccountId
+     ),
+-  }),
++  })
+ );
+ 
+ export const sessions = pgTable("sessions", {
+diff --git a/src/lib/db/search-vector.test.ts b/src/lib/db/search-vector.test.ts
+index 67e21c2..efd85cc 100644
+--- a/src/lib/db/search-vector.test.ts
++++ b/src/lib/db/search-vector.test.ts
+@@ -24,24 +24,18 @@ describe("articles.searchVector generated column (Phase 19 / H11)", () => {
+   it("includes title in the searchVector with weight A", () => {
+     // The generated column should reference title with weight A.
+     // We check for the setweight call pattern.
+-    expect(schemaSource).toMatch(
+-      /setweight\s*\(\s*to_tsvector.*title.*['")],?\s*['"]A['"]/s,
+-    );
++    expect(schemaSource).toMatch(/setweight\s*\(\s*to_tsvector.*title.*['")],?\s*['"]A['"]/s);
+   });
+ 
+   it("includes excerpt in the searchVector with weight B", () => {
+-    expect(schemaSource).toMatch(
+-      /setweight\s*\(\s*to_tsvector.*excerpt.*['")],?\s*['"]B['"]/s,
+-    );
++    expect(schemaSource).toMatch(/setweight\s*\(\s*to_tsvector.*excerpt.*['")],?\s*['"]B['"]/s);
+   });
+ 
+   it("includes body in the searchVector with weight C (Phase 19 / H11)", () => {
+     // The body column was added in migration 0003 but the searchVector
+     // generated column was never updated to include it. This test
+     // verifies the fix is in place.
+-    expect(schemaSource).toMatch(
+-      /setweight\s*\(\s*to_tsvector.*body.*['")],?\s*['"]C['"]/s,
+-    );
++    expect(schemaSource).toMatch(/setweight\s*\(\s*to_tsvector.*body.*['")],?\s*['"]C['"]/s);
+   });
+ 
+   it("includes source name in the searchVector with weight D (Phase 19 / H11)", () => {
+diff --git a/src/lib/db/seed.ts b/src/lib/db/seed.ts
+index 9190382..5cc0f97 100644
+--- a/src/lib/db/seed.ts
++++ b/src/lib/db/seed.ts
+@@ -11,24 +11,12 @@ import type { ContentAvailability, FeedFormat } from "./schema";
+ 
+ // ─── Categories ───────────────────────────────────────────────────────────
+ export const seedCategories = [
+-  {
+-    slug: "top-stories",
+-    name: "Top Stories",
+-    description: "The most important stories",
+-  },
++  { slug: "top-stories", name: "Top Stories", description: "The most important stories" },
+   { slug: "local", name: "Local", description: "News from your local area" },
+-  {
+-    slug: "tech",
+-    name: "Tech",
+-    description: "Technology and digital innovation",
+-  },
++  { slug: "tech", name: "Tech", description: "Technology and digital innovation" },
+   { slug: "global", name: "Global", description: "International news" },
+   { slug: "finance", name: "Finance", description: "Markets and economy" },
+-  {
+-    slug: "politics",
+-    name: "Politics",
+-    description: "Domestic and international politics",
+-  },
++  { slug: "politics", name: "Politics", description: "Domestic and international politics" },
+   { slug: "culture", name: "Culture", description: "Arts and entertainment" },
+ ];
+ 
+@@ -42,55 +30,13 @@ export const seedSources: Array<{
+   feedFormat: FeedFormat;
+   priority: number;
+ }> = [
+-  {
+-    name: "Reuters",
+-    url: "https://reuters.com",
+-    feedUrl: "https://reuters.com/feed",
+-    feedFormat: "rss",
+-    priority: 1,
+-  },
+-  {
+-    name: "AP News",
+-    url: "https://apnews.com",
+-    feedUrl: "https://apnews.com/feed",
+-    feedFormat: "rss",
+-    priority: 1,
+-  },
+-  {
+-    name: "Bloomberg",
+-    url: "https://bloomberg.com",
+-    feedUrl: "https://bloomberg.com/feed",
+-    feedFormat: "rss",
+-    priority: 2,
+-  },
+-  {
+-    name: "The Verge",
+-    url: "https://theverge.com",
+-    feedUrl: "https://theverge.com/feed",
+-    feedFormat: "rss",
+-    priority: 2,
+-  },
+-  {
+-    name: "Straits Times",
+-    url: "https://straitstimes.com",
+-    feedUrl: "https://straitstimes.com/feed",
+-    feedFormat: "rss",
+-    priority: 3,
+-  },
+-  {
+-    name: "CNA",
+-    url: "https://channelnewsasia.com",
+-    feedUrl: "https://channelnewsasia.com/feed",
+-    feedFormat: "rss",
+-    priority: 3,
+-  },
+-  {
+-    name: "TechCrunch",
+-    url: "https://techcrunch.com",
+-    feedUrl: "https://techcrunch.com/feed",
+-    feedFormat: "rss",
+-    priority: 2,
+-  },
++  { name: "Reuters", url: "https://reuters.com", feedUrl: "https://reuters.com/feed", feedFormat: "rss", priority: 1 },
++  { name: "AP News", url: "https://apnews.com", feedUrl: "https://apnews.com/feed", feedFormat: "rss", priority: 1 },
++  { name: "Bloomberg", url: "https://bloomberg.com", feedUrl: "https://bloomberg.com/feed", feedFormat: "rss", priority: 2 },
++  { name: "The Verge", url: "https://theverge.com", feedUrl: "https://theverge.com/feed", feedFormat: "rss", priority: 2 },
++  { name: "Straits Times", url: "https://straitstimes.com", feedUrl: "https://straitstimes.com/feed", feedFormat: "rss", priority: 3 },
++  { name: "CNA", url: "https://channelnewsasia.com", feedUrl: "https://channelnewsasia.com/feed", feedFormat: "rss", priority: 3 },
++  { name: "TechCrunch", url: "https://techcrunch.com", feedUrl: "https://techcrunch.com/feed", feedFormat: "rss", priority: 2 },
+ ];
+ 
+ // ─── Articles (30) ─────────────────────────────────────────────────────────
+@@ -108,398 +54,36 @@ export const seedArticles: Array<{
+   categorySlug: string;
+   sourceUrl: string;
+ }> = [
+-  {
+-    title:
+-      "Global Markets Rally as G7 Inflation Cools for Third Straight Month",
+-    excerpt:
+-      "Benchmark indices across major economies posted gains after synchronized inflation data suggested central banks may have room to ease monetary policy in Q3.",
+-    canonicalUrl: "https://onestop.news/article/1",
+-    contentHash: "hash001",
+-    contentAvailability: "full_text",
+-    importanceScore: 0.95,
+-    hasSummary: true,
+-    publishedAt: new Date("2026-06-10T13:30:00"),
+-    categorySlug: "top-stories",
+-    sourceUrl: "https://bloomberg.com",
+-  },
+-  {
+-    title: "EU Parliament Votes on AI Act Enforcement Framework",
+-    excerpt:
+-      "The European Parliament has voted to establish a comprehensive enforcement framework for the AI Act, with 142 in favor and 37 against.",
+-    canonicalUrl: "https://onestop.news/article/2",
+-    contentHash: "hash002",
+-    contentAvailability: "full_text",
+-    importanceScore: 0.92,
+-    hasSummary: true,
+-    publishedAt: new Date("2026-06-10T12:00:00"),
+-    categorySlug: "top-stories",
+-    sourceUrl: "https://reuters.com",
+-  },
+-  {
+-    title: "SpaceX Starship Completes First Orbital Refueling Test",
+-    excerpt:
+-      "The historic mission marks a critical milestone for lunar and Mars ambitions.",
+-    canonicalUrl: "https://onestop.news/article/3",
+-    contentHash: "hash003",
+-    contentAvailability: "partial_text",
+-    importanceScore: 0.88,
+-    hasSummary: true,
+-    publishedAt: new Date("2026-06-10T11:30:00"),
+-    categorySlug: "top-stories",
+-    sourceUrl: "https://apnews.com",
+-  },
+-  {
+-    title: "Apple Unveils On-Device AI Framework With App Store Integration",
+-    excerpt:
+-      "The new framework allows third-party apps to tap into Apple Intelligence models running locally on iPhone and Mac.",
+-    canonicalUrl: "https://onestop.news/article/4",
+-    contentHash: "hash004",
+-    contentAvailability: "full_text",
+-    importanceScore: 0.85,
+-    hasSummary: true,
+-    publishedAt: new Date("2026-06-10T10:45:00"),
+-    categorySlug: "top-stories",
+-    sourceUrl: "https://theverge.com",
+-  },
+-  {
+-    title: "WHO Declares New Mpox Variant a Public Health Emergency",
+-    excerpt:
+-      "The designation unlocks emergency funding and coordinated response mechanisms as cases spread across Central Africa.",
+-    canonicalUrl: "https://onestop.news/article/5",
+-    contentHash: "hash005",
+-    contentAvailability: "full_text",
+-    importanceScore: 0.87,
+-    hasSummary: true,
+-    publishedAt: new Date("2026-06-10T09:15:00"),
+-    categorySlug: "top-stories",
+-    sourceUrl: "https://reuters.com",
+-  },
+-  {
+-    title: "Japan Central Bank Signals End to Negative Interest Rate Era",
+-    excerpt:
+-      "The historic shift comes as inflation stabilizes above 2% for 15 consecutive months.",
+-    canonicalUrl: "https://onestop.news/article/6",
+-    contentHash: "hash006",
+-    contentAvailability: "partial_text",
+-    importanceScore: 0.83,
+-    hasSummary: false,
+-    publishedAt: new Date("2026-06-10T08:30:00"),
+-    categorySlug: "top-stories",
+-    sourceUrl: "https://apnews.com",
+-  },
+-  {
+-    title: "Singapore MRT Cross Island Line Phase 2 Alignment Confirmed",
+-    excerpt:
+-      "The Land Transport Authority has confirmed the final alignment for Phase 2 of the Cross Island Line.",
+-    canonicalUrl: "https://onestop.news/article/7",
+-    contentHash: "hash007",
+-    contentAvailability: "excerpt",
+-    importanceScore: 0.65,
+-    hasSummary: false,
+-    publishedAt: new Date("2026-06-09T17:00:00"),
+-    categorySlug: "local",
+-    sourceUrl: "https://straitstimes.com",
+-  },
+-  {
+-    title:
+-      "GE2025 Campaign Enters Final Week With Housing Policy as Key Battleground",
+-    excerpt:
+-      "Candidates sharpen their positions on public housing supply and affordability.",
+-    canonicalUrl: "https://onestop.news/article/8",
+-    contentHash: "hash008",
+-    contentAvailability: "full_text",
+-    importanceScore: 0.91,
+-    hasSummary: true,
+-    publishedAt: new Date("2026-06-09T14:00:00"),
+-    categorySlug: "politics",
+-    sourceUrl: "https://channelnewsasia.com",
+-  },
+-  {
+-    title:
+-      "China Announces $40B Semiconductor Subsidy Package Amid Export Controls",
+-    excerpt:
+-      "The state-backed investment targets legacy chip manufacturing and advanced packaging.",
+-    canonicalUrl: "https://onestop.news/article/9",
+-    contentHash: "hash009",
+-    contentAvailability: "full_text",
+-    importanceScore: 0.89,
+-    hasSummary: true,
+-    publishedAt: new Date("2026-06-09T11:30:00"),
+-    categorySlug: "tech",
+-    sourceUrl: "https://reuters.com",
+-  },
+-  {
+-    title: "Major K-pop Agency Launches AI Artist Management Division",
+-    excerpt:
+-      "The move signals a broader industry shift toward virtual performers.",
+-    canonicalUrl: "https://onestop.news/article/10",
+-    contentHash: "hash010",
+-    contentAvailability: "partial_text",
+-    importanceScore: 0.72,
+-    hasSummary: false,
+-    publishedAt: new Date("2026-06-09T09:00:00"),
+-    categorySlug: "culture",
+-    sourceUrl: "https://theverge.com",
+-  },
+-  {
+-    title: "Global Chip Shortage Eases as Supply Chain Normalizes",
+-    excerpt:
+-      "Automotive and consumer electronics manufacturers report stabilizing component availability after two years of constraints.",
+-    canonicalUrl: "https://onestop.news/article/11",
+-    contentHash: "hash011",
+-    contentAvailability: "full_text",
+-    importanceScore: 0.84,
+-    hasSummary: true,
+-    publishedAt: new Date("2026-06-08T16:00:00"),
+-    categorySlug: "tech",
+-    sourceUrl: "https://techcrunch.com",
+-  },
+-  {
+-    title: "Singapore Budget 2026: GST Rate Hike to 9% Confirmed",
+-    excerpt:
+-      "The government confirmed the final phase of the GST increase will proceed as planned in 2026.",
+-    canonicalUrl: "https://onestop.news/article/12",
+-    contentHash: "hash012",
+-    contentAvailability: "excerpt",
+-    importanceScore: 0.78,
+-    hasSummary: false,
+-    publishedAt: new Date("2026-06-08T10:00:00"),
+-    categorySlug: "local",
+-    sourceUrl: "https://straitstimes.com",
+-  },
+-  {
+-    title: "UN Climate Panel Warns of Irreversible Tipping Points",
+-    excerpt:
+-      "The latest IPCC report identifies five critical tipping points that could trigger cascading climate effects within decades.",
+-    canonicalUrl: "https://onestop.news/article/13",
+-    contentHash: "hash013",
+-    contentAvailability: "full_text",
+-    importanceScore: 0.9,
+-    hasSummary: true,
+-    publishedAt: new Date("2026-06-07T14:30:00"),
+-    categorySlug: "global",
+-    sourceUrl: "https://reuters.com",
+-  },
+-  {
+-    title: "Meta's New AR Glasses Replace Smartphones by 2028",
+-    excerpt:
+-      "Mark Zuckerberg claims the device will make smartphones obsolete within three years.",
+-    canonicalUrl: "https://onestop.news/article/14",
+-    contentHash: "hash014",
+-    contentAvailability: "partial_text",
+-    importanceScore: 0.81,
+-    hasSummary: false,
+-    publishedAt: new Date("2026-06-07T09:00:00"),
+-    categorySlug: "tech",
+-    sourceUrl: "https://theverge.com",
+-  },
+-  {
+-    title: "Oil Prices Surge After Middle East Tensions Escalate",
+-    excerpt:
+-      "Brent crude jumps 8% as shipping routes face disruption in the Strait of Hormuz.",
+-    canonicalUrl: "https://onestop.news/article/15",
+-    contentHash: "hash015",
+-    contentAvailability: "full_text",
+-    importanceScore: 0.86,
+-    hasSummary: true,
+-    publishedAt: new Date("2026-06-06T12:00:00"),
+-    categorySlug: "finance",
+-    sourceUrl: "https://bloomberg.com",
+-  },
+-  {
+-    title: "New COVID-19 Variant Detected in Southeast Asia",
+-    excerpt:
+-      "Health authorities in Malaysia and Thailand report cases of a new variant with increased transmissibility.",
+-    canonicalUrl: "https://onestop.news/article/16",
+-    contentHash: "hash016",
+-    contentAvailability: "full_text",
+-    importanceScore: 0.88,
+-    hasSummary: true,
+-    publishedAt: new Date("2026-06-06T08:00:00"),
+-    categorySlug: "global",
+-    sourceUrl: "https://apnews.com",
+-  },
+-  {
+-    title: "Singapore's Changi Airport Retains World's Best Airport Title",
+-    excerpt:
+-      "The airport scores top marks for dining, retail, and operational efficiency.",
+-    canonicalUrl: "https://onestop.news/article/17",
+-    contentHash: "hash017",
+-    contentAvailability: "excerpt",
+-    importanceScore: 0.7,
+-    hasSummary: false,
+-    publishedAt: new Date("2026-06-05T16:00:00"),
+-    categorySlug: "local",
+-    sourceUrl: "https://channelnewsasia.com",
+-  },
+-  {
+-    title: "Tesla Reveals Next-Gen Battery Tech with 50% Range Boost",
+-    excerpt:
+-      "The silicon anode batteries promise 1,000km range on a single charge starting from 2027.",
+-    canonicalUrl: "https://onestop.news/article/18",
+-    contentHash: "hash018",
+-    contentAvailability: "full_text",
+-    importanceScore: 0.82,
+-    hasSummary: true,
+-    publishedAt: new Date("2026-06-05T10:00:00"),
+-    categorySlug: "tech",
+-    sourceUrl: "https://techcrunch.com",
+-  },
+-  {
+-    title: "ASEAN Summit Reaches Landmark Trade Agreement",
+-    excerpt:
+-      "The 10-nation bloc agrees on a unified digital trade framework that will eliminate cross-border data tariffs.",
+-    canonicalUrl: "https://onestop.news/article/19",
+-    contentHash: "hash019",
+-    contentAvailability: "full_text",
+-    importanceScore: 0.87,
+-    hasSummary: true,
+-    publishedAt: new Date("2026-06-04T14:00:00"),
+-    categorySlug: "global",
+-    sourceUrl: "https://reuters.com",
+-  },
+-  {
+-    title: "Global Semiconductor Investment Hits $100B in 2026",
+-    excerpt:
+-      "Governments and companies worldwide pour record funding into chip manufacturing capacity.",
+-    canonicalUrl: "https://onestop.news/article/20",
+-    contentHash: "hash020",
+-    contentAvailability: "partial_text",
+-    importanceScore: 0.79,
+-    hasSummary: false,
+-    publishedAt: new Date("2026-06-04T09:00:00"),
+-    categorySlug: "finance",
+-    sourceUrl: "https://bloomberg.com",
+-  },
+-  {
+-    title: "Singapore Launches National AI Strategy 2.0",
+-    excerpt:
+-      "The updated strategy focuses on developing AI talent and infrastructure to position the city-state as a global AI hub.",
+-    canonicalUrl: "https://onestop.news/article/21",
+-    contentHash: "hash021",
+-    contentAvailability: "full_text",
+-    importanceScore: 0.8,
+-    hasSummary: true,
+-    publishedAt: new Date("2026-06-03T16:00:00"),
+-    categorySlug: "local",
+-    sourceUrl: "https://channelnewsasia.com",
+-  },
+-  {
+-    title: "Netflix Reports Record Subscriber Growth in Q2",
+-    excerpt:
+-      "The streaming giant added 8.5 million subscribers, beating analyst expectations by 2 million.",
+-    canonicalUrl: "https://onestop.news/article/22",
+-    contentHash: "hash022",
+-    contentAvailability: "full_text",
+-    importanceScore: 0.75,
+-    hasSummary: true,
+-    publishedAt: new Date("2026-06-03T10:00:00"),
+-    categorySlug: "culture",
+-    sourceUrl: "https://bloomberg.com",
+-  },
+-  {
+-    title: "US Federal Reserve Holds Rates Steady at 5.25%",
+-    excerpt:
+-      "The Fed signals potential rate cuts later in the year as inflation shows signs of stabilization.",
+-    canonicalUrl: "https://onestop.news/article/23",
+-    contentHash: "hash023",
+-    contentAvailability: "full_text",
+-    importanceScore: 0.86,
+-    hasSummary: true,
+-    publishedAt: new Date("2026-06-02T14:00:00"),
+-    categorySlug: "finance",
+-    sourceUrl: "https://reuters.com",
+-  },
+-  {
+-    title: "Open Source AI Model Surpasses GPT-4 on Benchmarks",
+-    excerpt:
+-      "A community-developed model achieves state-of-the-art results on multiple reasoning benchmarks.",
+-    canonicalUrl: "https://onestop.news/article/24",
+-    contentHash: "hash024",
+-    contentAvailability: "partial_text",
+-    importanceScore: 0.78,
+-    hasSummary: false,
+-    publishedAt: new Date("2026-06-02T09:00:00"),
+-    categorySlug: "tech",
+-    sourceUrl: "https://techcrunch.com",
+-  },
+-  {
+-    title: "Singapore Food Festival Draws Record Crowds",
+-    excerpt: "",
+-    canonicalUrl: "https://onestop.news/article/25",
+-    contentHash: "hash025",
+-    contentAvailability: "title_only",
+-    importanceScore: 0.6,
+-    hasSummary: false,
+-    publishedAt: new Date("2026-06-01T16:00:00"),
+-    categorySlug: "local",
+-    sourceUrl: "https://straitstimes.com",
+-  },
+-  {
+-    title: "European Elections See Surge in Youth Voter Turnout",
+-    excerpt:
+-      "Turnout among voters aged 18-30 reached a record 62%, reshaping the political landscape.",
+-    canonicalUrl: "https://onestop.news/article/26",
+-    contentHash: "hash026",
+-    contentAvailability: "full_text",
+-    importanceScore: 0.81,
+-    hasSummary: true,
+-    publishedAt: new Date("2026-06-01T10:00:00"),
+-    categorySlug: "politics",
+-    sourceUrl: "https://reuters.com",
+-  },
+-  {
+-    title: "Quantum Computing Breakthrough Achieved at MIT",
+-    excerpt:
+-      "Researchers demonstrate a 1000-qubit processor with error correction, a major step toward practical quantum computers.",
+-    canonicalUrl: "https://onestop.news/article/27",
+-    contentHash: "hash027",
+-    contentAvailability: "full_text",
+-    importanceScore: 0.84,
+-    hasSummary: true,
+-    publishedAt: new Date("2026-05-31T14:00:00"),
+-    categorySlug: "tech",
+-    sourceUrl: "https://apnews.com",
+-  },
+-  {
+-    title: "Global Art Market Reaches $65B in 2026",
+-    excerpt:
+-      "Digital art and NFTs drive growth as traditional galleries adapt to new technologies.",
+-    canonicalUrl: "https://onestop.news/article/28",
+-    contentHash: "hash028",
+-    contentAvailability: "partial_text",
+-    importanceScore: 0.71,
+-    hasSummary: false,
+-    publishedAt: new Date("2026-05-31T09:00:00"),
+-    categorySlug: "culture",
+-    sourceUrl: "https://bloomberg.com",
+-  },
+-  {
+-    title: "Singapore Hospitals Adopt AI Diagnostic Tools",
+-    excerpt:
+-      "Three major hospitals deploy AI-powered imaging systems to improve early detection of critical conditions.",
+-    canonicalUrl: "https://onestop.news/article/29",
+-    contentHash: "hash029",
+-    contentAvailability: "full_text",
+-    importanceScore: 0.77,
+-    hasSummary: true,
+-    publishedAt: new Date("2026-05-30T14:00:00"),
+-    categorySlug: "local",
+-    sourceUrl: "https://channelnewsasia.com",
+-  },
+-  {
+-    title: "Cyberattack on Major Payment Processor Affects Millions",
+-    excerpt:
+-      "A sophisticated attack on a leading payment processor exposes data from 30 million customers.",
+-    canonicalUrl: "https://onestop.news/article/30",
+-    contentHash: "hash030",
+-    contentAvailability: "full_text",
+-    importanceScore: 0.9,
+-    hasSummary: true,
+-    publishedAt: new Date("2026-05-30T10:00:00"),
+-    categorySlug: "tech",
+-    sourceUrl: "https://reuters.com",
+-  },
++  { title: "Global Markets Rally as G7 Inflation Cools for Third Straight Month", excerpt: "Benchmark indices across major economies posted gains after synchronized inflation data suggested central banks may have room to ease monetary policy in Q3.", canonicalUrl: "https://onestop.news/article/1", contentHash: "hash001", contentAvailability: "full_text", importanceScore: 0.95, hasSummary: true, publishedAt: new Date("2026-06-10T13:30:00"), categorySlug: "top-stories", sourceUrl: "https://bloomberg.com" },
++  { title: "EU Parliament Votes on AI Act Enforcement Framework", excerpt: "The European Parliament has voted to establish a comprehensive enforcement framework for the AI Act, with 142 in favor and 37 against.", canonicalUrl: "https://onestop.news/article/2", contentHash: "hash002", contentAvailability: "full_text", importanceScore: 0.92, hasSummary: true, publishedAt: new Date("2026-06-10T12:00:00"), categorySlug: "top-stories", sourceUrl: "https://reuters.com" },
++  { title: "SpaceX Starship Completes First Orbital Refueling Test", excerpt: "The historic mission marks a critical milestone for lunar and Mars ambitions.", canonicalUrl: "https://onestop.news/article/3", contentHash: "hash003", contentAvailability: "partial_text", importanceScore: 0.88, hasSummary: true, publishedAt: new Date("2026-06-10T11:30:00"), categorySlug: "top-stories", sourceUrl: "https://apnews.com" },
++  { title: "Apple Unveils On-Device AI Framework With App Store Integration", excerpt: "The new framework allows third-party apps to tap into Apple Intelligence models running locally on iPhone and Mac.", canonicalUrl: "https://onestop.news/article/4", contentHash: "hash004", contentAvailability: "full_text", importanceScore: 0.85, hasSummary: true, publishedAt: new Date("2026-06-10T10:45:00"), categorySlug: "top-stories", sourceUrl: "https://theverge.com" },
++  { title: "WHO Declares New Mpox Variant a Public Health Emergency", excerpt: "The designation unlocks emergency funding and coordinated response mechanisms as cases spread across Central Africa.", canonicalUrl: "https://onestop.news/article/5", contentHash: "hash005", contentAvailability: "full_text", importanceScore: 0.87, hasSummary: true, publishedAt: new Date("2026-06-10T09:15:00"), categorySlug: "top-stories", sourceUrl: "https://reuters.com" },
++  { title: "Japan Central Bank Signals End to Negative Interest Rate Era", excerpt: "The historic shift comes as inflation stabilizes above 2% for 15 consecutive months.", canonicalUrl: "https://onestop.news/article/6", contentHash: "hash006", contentAvailability: "partial_text", importanceScore: 0.83, hasSummary: false, publishedAt: new Date("2026-06-10T08:30:00"), categorySlug: "top-stories", sourceUrl: "https://apnews.com" },
++  { title: "Singapore MRT Cross Island Line Phase 2 Alignment Confirmed", excerpt: "The Land Transport Authority has confirmed the final alignment for Phase 2 of the Cross Island Line.", canonicalUrl: "https://onestop.news/article/7", contentHash: "hash007", contentAvailability: "excerpt", importanceScore: 0.65, hasSummary: false, publishedAt: new Date("2026-06-09T17:00:00"), categorySlug: "local", sourceUrl: "https://straitstimes.com" },
++  { title: "GE2025 Campaign Enters Final Week With Housing Policy as Key Battleground", excerpt: "Candidates sharpen their positions on public housing supply and affordability.", canonicalUrl: "https://onestop.news/article/8", contentHash: "hash008", contentAvailability: "full_text", importanceScore: 0.91, hasSummary: true, publishedAt: new Date("2026-06-09T14:00:00"), categorySlug: "politics", sourceUrl: "https://channelnewsasia.com" },
++  { title: "China Announces $40B Semiconductor Subsidy Package Amid Export Controls", excerpt: "The state-backed investment targets legacy chip manufacturing and advanced packaging.", canonicalUrl: "https://onestop.news/article/9", contentHash: "hash009", contentAvailability: "full_text", importanceScore: 0.89, hasSummary: true, publishedAt: new Date("2026-06-09T11:30:00"), categorySlug: "tech", sourceUrl: "https://reuters.com" },
++  { title: "Major K-pop Agency Launches AI Artist Management Division", excerpt: "The move signals a broader industry shift toward virtual performers.", canonicalUrl: "https://onestop.news/article/10", contentHash: "hash010", contentAvailability: "partial_text", importanceScore: 0.72, hasSummary: false, publishedAt: new Date("2026-06-09T09:00:00"), categorySlug: "culture", sourceUrl: "https://theverge.com" },
++  { title: "Global Chip Shortage Eases as Supply Chain Normalizes", excerpt: "Automotive and consumer electronics manufacturers report stabilizing component availability after two years of constraints.", canonicalUrl: "https://onestop.news/article/11", contentHash: "hash011", contentAvailability: "full_text", importanceScore: 0.84, hasSummary: true, publishedAt: new Date("2026-06-08T16:00:00"), categorySlug: "tech", sourceUrl: "https://techcrunch.com" },
++  { title: "Singapore Budget 2026: GST Rate Hike to 9% Confirmed", excerpt: "The government confirmed the final phase of the GST increase will proceed as planned in 2026.", canonicalUrl: "https://onestop.news/article/12", contentHash: "hash012", contentAvailability: "excerpt", importanceScore: 0.78, hasSummary: false, publishedAt: new Date("2026-06-08T10:00:00"), categorySlug: "local", sourceUrl: "https://straitstimes.com" },
++  { title: "UN Climate Panel Warns of Irreversible Tipping Points", excerpt: "The latest IPCC report identifies five critical tipping points that could trigger cascading climate effects within decades.", canonicalUrl: "https://onestop.news/article/13", contentHash: "hash013", contentAvailability: "full_text", importanceScore: 0.9, hasSummary: true, publishedAt: new Date("2026-06-07T14:30:00"), categorySlug: "global", sourceUrl: "https://reuters.com" },
++  { title: "Meta's New AR Glasses Replace Smartphones by 2028", excerpt: "Mark Zuckerberg claims the device will make smartphones obsolete within three years.", canonicalUrl: "https://onestop.news/article/14", contentHash: "hash014", contentAvailability: "partial_text", importanceScore: 0.81, hasSummary: false, publishedAt: new Date("2026-06-07T09:00:00"), categorySlug: "tech", sourceUrl: "https://theverge.com" },
++  { title: "Oil Prices Surge After Middle East Tensions Escalate", excerpt: "Brent crude jumps 8% as shipping routes face disruption in the Strait of Hormuz.", canonicalUrl: "https://onestop.news/article/15", contentHash: "hash015", contentAvailability: "full_text", importanceScore: 0.86, hasSummary: true, publishedAt: new Date("2026-06-06T12:00:00"), categorySlug: "finance", sourceUrl: "https://bloomberg.com" },
++  { title: "New COVID-19 Variant Detected in Southeast Asia", excerpt: "Health authorities in Malaysia and Thailand report cases of a new variant with increased transmissibility.", canonicalUrl: "https://onestop.news/article/16", contentHash: "hash016", contentAvailability: "full_text", importanceScore: 0.88, hasSummary: true, publishedAt: new Date("2026-06-06T08:00:00"), categorySlug: "global", sourceUrl: "https://apnews.com" },
++  { title: "Singapore's Changi Airport Retains World's Best Airport Title", excerpt: "The airport scores top marks for dining, retail, and operational efficiency.", canonicalUrl: "https://onestop.news/article/17", contentHash: "hash017", contentAvailability: "excerpt", importanceScore: 0.7, hasSummary: false, publishedAt: new Date("2026-06-05T16:00:00"), categorySlug: "local", sourceUrl: "https://channelnewsasia.com" },
++  { title: "Tesla Reveals Next-Gen Battery Tech with 50% Range Boost", excerpt: "The silicon anode batteries promise 1,000km range on a single charge starting from 2027.", canonicalUrl: "https://onestop.news/article/18", contentHash: "hash018", contentAvailability: "full_text", importanceScore: 0.82, hasSummary: true, publishedAt: new Date("2026-06-05T10:00:00"), categorySlug: "tech", sourceUrl: "https://techcrunch.com" },
++  { title: "ASEAN Summit Reaches Landmark Trade Agreement", excerpt: "The 10-nation bloc agrees on a unified digital trade framework that will eliminate cross-border data tariffs.", canonicalUrl: "https://onestop.news/article/19", contentHash: "hash019", contentAvailability: "full_text", importanceScore: 0.87, hasSummary: true, publishedAt: new Date("2026-06-04T14:00:00"), categorySlug: "global", sourceUrl: "https://reuters.com" },
++  { title: "Global Semiconductor Investment Hits $100B in 2026", excerpt: "Governments and companies worldwide pour record funding into chip manufacturing capacity.", canonicalUrl: "https://onestop.news/article/20", contentHash: "hash020", contentAvailability: "partial_text", importanceScore: 0.79, hasSummary: false, publishedAt: new Date("2026-06-04T09:00:00"), categorySlug: "finance", sourceUrl: "https://bloomberg.com" },
++  { title: "Singapore Launches National AI Strategy 2.0", excerpt: "The updated strategy focuses on developing AI talent and infrastructure to position the city-state as a global AI hub.", canonicalUrl: "https://onestop.news/article/21", contentHash: "hash021", contentAvailability: "full_text", importanceScore: 0.8, hasSummary: true, publishedAt: new Date("2026-06-03T16:00:00"), categorySlug: "local", sourceUrl: "https://channelnewsasia.com" },
++  { title: "Netflix Reports Record Subscriber Growth in Q2", excerpt: "The streaming giant added 8.5 million subscribers, beating analyst expectations by 2 million.", canonicalUrl: "https://onestop.news/article/22", contentHash: "hash022", contentAvailability: "full_text", importanceScore: 0.75, hasSummary: true, publishedAt: new Date("2026-06-03T10:00:00"), categorySlug: "culture", sourceUrl: "https://bloomberg.com" },
++  { title: "US Federal Reserve Holds Rates Steady at 5.25%", excerpt: "The Fed signals potential rate cuts later in the year as inflation shows signs of stabilization.", canonicalUrl: "https://onestop.news/article/23", contentHash: "hash023", contentAvailability: "full_text", importanceScore: 0.86, hasSummary: true, publishedAt: new Date("2026-06-02T14:00:00"), categorySlug: "finance", sourceUrl: "https://reuters.com" },
++  { title: "Open Source AI Model Surpasses GPT-4 on Benchmarks", excerpt: "A community-developed model achieves state-of-the-art results on multiple reasoning benchmarks.", canonicalUrl: "https://onestop.news/article/24", contentHash: "hash024", contentAvailability: "partial_text", importanceScore: 0.78, hasSummary: false, publishedAt: new Date("2026-06-02T09:00:00"), categorySlug: "tech", sourceUrl: "https://techcrunch.com" },
++  { title: "Singapore Food Festival Draws Record Crowds", excerpt: "", canonicalUrl: "https://onestop.news/article/25", contentHash: "hash025", contentAvailability: "title_only", importanceScore: 0.6, hasSummary: false, publishedAt: new Date("2026-06-01T16:00:00"), categorySlug: "local", sourceUrl: "https://straitstimes.com" },
++  { title: "European Elections See Surge in Youth Voter Turnout", excerpt: "Turnout among voters aged 18-30 reached a record 62%, reshaping the political landscape.", canonicalUrl: "https://onestop.news/article/26", contentHash: "hash026", contentAvailability: "full_text", importanceScore: 0.81, hasSummary: true, publishedAt: new Date("2026-06-01T10:00:00"), categorySlug: "politics", sourceUrl: "https://reuters.com" },
++  { title: "Quantum Computing Breakthrough Achieved at MIT", excerpt: "Researchers demonstrate a 1000-qubit processor with error correction, a major step toward practical quantum computers.", canonicalUrl: "https://onestop.news/article/27", contentHash: "hash027", contentAvailability: "full_text", importanceScore: 0.84, hasSummary: true, publishedAt: new Date("2026-05-31T14:00:00"), categorySlug: "tech", sourceUrl: "https://apnews.com" },
++  { title: "Global Art Market Reaches $65B in 2026", excerpt: "Digital art and NFTs drive growth as traditional galleries adapt to new technologies.", canonicalUrl: "https://onestop.news/article/28", contentHash: "hash028", contentAvailability: "partial_text", importanceScore: 0.71, hasSummary: false, publishedAt: new Date("2026-05-31T09:00:00"), categorySlug: "culture", sourceUrl: "https://bloomberg.com" },
++  { title: "Singapore Hospitals Adopt AI Diagnostic Tools", excerpt: "Three major hospitals deploy AI-powered imaging systems to improve early detection of critical conditions.", canonicalUrl: "https://onestop.news/article/29", contentHash: "hash029", contentAvailability: "full_text", importanceScore: 0.77, hasSummary: true, publishedAt: new Date("2026-05-30T14:00:00"), categorySlug: "local", sourceUrl: "https://channelnewsasia.com" },
++  { title: "Cyberattack on Major Payment Processor Affects Millions", excerpt: "A sophisticated attack on a leading payment processor exposes data from 30 million customers.", canonicalUrl: "https://onestop.news/article/30", contentHash: "hash030", contentAvailability: "full_text", importanceScore: 0.9, hasSummary: true, publishedAt: new Date("2026-05-30T10:00:00"), categorySlug: "tech", sourceUrl: "https://reuters.com" },
+ ];
+ 
+ // ─── Summaries (15) ────────────────────────────────────────────────────────
+@@ -513,259 +97,22 @@ export const seedSummaries: Array<{
+   coveragePercentage: number;
+   originalArticleUrl: string;
+ }> = [
+-  {
+-    summaryText:
+-      "Global stock markets surged after G7 inflation data showed cooling for the third consecutive month, giving central banks room to ease monetary policy. Major indices including the S&P 500, FTSE 100, and Nikkei 225 posted significant gains.",
+-    keyPoints: [
+-      "G7 inflation cooled for third straight month",
+-      "Central banks may ease policy in Q3",
+-      "S&P 500, FTSE 100, Nikkei all gained",
+-    ],
+-    sourcesCited: [
+-      { url: "https://bloomberg.com/1", title: "Bloomberg Markets" },
+-      { url: "https://reuters.com/1", title: "Reuters Business" },
+-    ],
+-    model: "claude-3-5-sonnet-20241022",
+-    tokensUsed: 482,
+-    aiStatement:
+-      "This summary was generated by AI with source citation. Always verify with original articles.",
+-    coveragePercentage: 87,
+-    originalArticleUrl: "https://onestop.news/article/1",
+-  },
+-  {
+-    summaryText:
+-      "The European Parliament passed the AI Act enforcement framework with 142 votes in favor, establishing oversight mechanisms for artificial intelligence systems in the EU.",
+-    keyPoints: [
+-      "142 votes in favor, 37 against",
+-      "Framework establishes AI oversight in EU",
+-      "Penalties up to 4% of global turnover",
+-    ],
+-    sourcesCited: [{ url: "https://reuters.com/2", title: "Reuters Europe" }],
+-    model: "claude-3-5-sonnet-20241022",
+-    tokensUsed: 356,
+-    aiStatement:
+-      "AI-generated summary. Please verify facts with original sources.",
+-    coveragePercentage: 92,
+-    originalArticleUrl: "https://onestop.news/article/2",
+-  },
+-  {
+-    summaryText:
+-      "SpaceX successfully completed the first orbital refueling test of its Starship vehicle, a critical milestone for future lunar and Mars missions. The demonstration involved two Starship vehicles docked in orbit.",
+-    keyPoints: [
+-      "First orbital refueling test completed",
+-      "Two Starship vehicles docked in orbit",
+-      "Critical for lunar and Mars missions",
+-    ],
+-    sourcesCited: [{ url: "https://apnews.com/3", title: "AP Science" }],
+-    model: "claude-3-5-sonnet-20241022",
+-    tokensUsed: 410,
+-    aiStatement: "AI-generated summary with source citation.",
+-    coveragePercentage: 85,
+-    originalArticleUrl: "https://onestop.news/article/3",
+-  },
+-  {
+-    summaryText:
+-      "Apple introduced a new on-device AI framework that integrates with the App Store, allowing third-party apps to access Apple Intelligence models locally on iPhone and Mac without sending data to the cloud.",
+-    keyPoints: [
+-      "On-device AI framework announced",
+-      "Integrates with App Store",
+-      "Local processing on iPhone and Mac",
+-    ],
+-    sourcesCited: [{ url: "https://theverge.com/4", title: "The Verge" }],
+-    model: "claude-3-5-sonnet-20241022",
+-    tokensUsed: 390,
+-    aiStatement: "AI-generated summary. Verify with original sources.",
+-    coveragePercentage: 88,
+-    originalArticleUrl: "https://onestop.news/article/4",
+-  },
+-  {
+-    summaryText:
+-      "The WHO declared a new mpox variant a public health emergency of international concern, unlocking emergency funding and coordinated response mechanisms as cases spread across Central Africa and neighboring regions.",
+-    keyPoints: [
+-      "New mpox variant declared emergency",
+-      "Cases spreading across Central Africa",
+-      "Emergency funding unlocked",
+-    ],
+-    sourcesCited: [{ url: "https://reuters.com/5", title: "Reuters Health" }],
+-    model: "claude-3-5-sonnet-20241022",
+-    tokensUsed: 450,
+-    aiStatement: "AI-generated summary with source citation.",
+-    coveragePercentage: 90,
+-    originalArticleUrl: "https://onestop.news/article/5",
+-  },
+-  {
+-    summaryText:
+-      "China announced a $40 billion semiconductor subsidy package targeting legacy chip manufacturing and advanced packaging, aiming to reduce dependence on foreign technology by 2030 amid ongoing export controls.",
+-    keyPoints: [
+-      "$40B semiconductor subsidy announced",
+-      "Targets legacy chips and advanced packaging",
+-      "Aims to reduce foreign dependence by 2030",
+-    ],
+-    sourcesCited: [
+-      { url: "https://reuters.com/9", title: "Reuters Technology" },
+-    ],
+-    model: "claude-3-5-sonnet-20241022",
+-    tokensUsed: 420,
+-    aiStatement: "AI-generated summary. Verify with original sources.",
+-    coveragePercentage: 86,
+-    originalArticleUrl: "https://onestop.news/article/9",
+-  },
+-  {
+-    summaryText:
+-      "The GE2025 campaign entered its final week with housing policy emerging as the key battleground. Candidates from major parties sharpened their positions on public housing supply and affordability for undecided voters.",
+-    keyPoints: [
+-      "Campaign enters final week",
+-      "Housing policy is key battleground",
+-      "Focus on supply and affordability",
+-    ],
+-    sourcesCited: [{ url: "https://cna.com/8", title: "CNA" }],
+-    model: "claude-3-5-sonnet-20241022",
+-    tokensUsed: 370,
+-    aiStatement: "AI-generated summary with source citation.",
+-    coveragePercentage: 84,
+-    originalArticleUrl: "https://onestop.news/article/8",
+-  },
+-  {
+-    summaryText:
+-      "The global chip shortage is easing as supply chains normalize, with automotive and consumer electronics manufacturers reporting stabilizing component availability after two years of constraints.",
+-    keyPoints: [
+-      "Chip shortage easing",
+-      "Supply chains normalizing",
+-      "Automotive and electronics stabilizing",
+-    ],
+-    sourcesCited: [{ url: "https://techcrunch.com/11", title: "TechCrunch" }],
+-    model: "claude-3-5-sonnet-20241022",
+-    tokensUsed: 340,
+-    aiStatement: "AI-generated summary. Verify with original sources.",
+-    coveragePercentage: 82,
+-    originalArticleUrl: "https://onestop.news/article/11",
+-  },
+-  {
+-    summaryText:
+-      "The UN Climate Panel warned of five irreversible tipping points that could trigger cascading climate effects within decades, urging immediate global action to prevent catastrophic outcomes.",
+-    keyPoints: [
+-      "Five critical tipping points identified",
+-      "Could trigger cascading climate effects",
+-      "Immediate action urged",
+-    ],
+-    sourcesCited: [
+-      { url: "https://reuters.com/13", title: "Reuters Environment" },
+-    ],
+-    model: "claude-3-5-sonnet-20241022",
+-    tokensUsed: 400,
+-    aiStatement: "AI-generated summary with source citation.",
+-    coveragePercentage: 89,
+-    originalArticleUrl: "https://onestop.news/article/13",
+-  },
+-  {
+-    summaryText:
+-      "Oil prices surged 8% after Middle East tensions escalated, causing disruption in the Strait of Hormuz, a critical shipping route for global crude oil transport.",
+-    keyPoints: [
+-      "Oil prices surged 8%",
+-      "Middle East tensions escalated",
+-      "Strait of Hormuz disrupted",
+-    ],
+-    sourcesCited: [
+-      { url: "https://bloomberg.com/15", title: "Bloomberg Energy" },
+-    ],
+-    model: "claude-3-5-sonnet-20241022",
+-    tokensUsed: 310,
+-    aiStatement: "AI-generated summary. Verify with original sources.",
+-    coveragePercentage: 80,
+-    originalArticleUrl: "https://onestop.news/article/15",
+-  },
+-  {
+-    summaryText:
+-      "A new COVID-19 variant was detected in Southeast Asia, with health authorities in Malaysia and Thailand reporting cases showing increased transmissibility.",
+-    keyPoints: [
+-      "New COVID-19 variant detected",
+-      "Found in Malaysia and Thailand",
+-      "Shows increased transmissibility",
+-    ],
+-    sourcesCited: [{ url: "https://apnews.com/16", title: "AP Health" }],
+-    model: "claude-3-5-sonnet-20241022",
+-    tokensUsed: 320,
+-    aiStatement: "AI-generated summary with source citation.",
+-    coveragePercentage: 83,
+-    originalArticleUrl: "https://onestop.news/article/16",
+-  },
+-  {
+-    summaryText:
+-      "ASEAN leaders reached a landmark trade agreement establishing a unified digital trade framework that will eliminate cross-border data tariffs among the 10-nation bloc.",
+-    keyPoints: [
+-      "Landmark digital trade agreement reached",
+-      "Eliminates cross-border data tariffs",
+-      "Covers 10 ASEAN nations",
+-    ],
+-    sourcesCited: [{ url: "https://reuters.com/19", title: "Reuters Asia" }],
+-    model: "claude-3-5-sonnet-20241022",
+-    tokensUsed: 360,
+-    aiStatement: "AI-generated summary. Verify with original sources.",
+-    coveragePercentage: 87,
+-    originalArticleUrl: "https://onestop.news/article/19",
+-  },
+-  {
+-    summaryText:
+-      "Tesla revealed next-generation battery technology using silicon anodes that promises a 50% range boost, offering 1,000km range on a single charge starting from 2027.",
+-    keyPoints: [
+-      "Silicon anode battery tech revealed",
+-      "50% range boost promised",
+-      "1,000km range from 2027",
+-    ],
+-    sourcesCited: [{ url: "https://techcrunch.com/18", title: "TechCrunch" }],
+-    model: "claude-3-5-sonnet-20241022",
+-    tokensUsed: 330,
+-    aiStatement: "AI-generated summary with source citation.",
+-    coveragePercentage: 81,
+-    originalArticleUrl: "https://onestop.news/article/18",
+-  },
+-  {
+-    summaryText:
+-      "Singapore launched its National AI Strategy 2.0, focusing on developing AI talent and infrastructure to position the city-state as a global AI hub by 2030.",
+-    keyPoints: [
+-      "National AI Strategy 2.0 launched",
+-      "Focus on talent and infrastructure",
+-      "Aims to be global AI hub by 2030",
+-    ],
+-    sourcesCited: [{ url: "https://cna.com/21", title: "CNA" }],
+-    model: "claude-3-5-sonnet-20241022",
+-    tokensUsed: 340,
+-    aiStatement: "AI-generated summary. Verify with original sources.",
+-    coveragePercentage: 85,
+-    originalArticleUrl: "https://onestop.news/article/21",
+-  },
+-  {
+-    summaryText:
+-      "Netflix reported record subscriber growth in Q2, adding 8.5 million subscribers and beating analyst expectations by 2 million, driven by the success of its ad-supported tier.",
+-    keyPoints: [
+-      "8.5 million subscribers added in Q2",
+-      "Beat expectations by 2 million",
+-      "Ad-supported tier driving growth",
+-    ],
+-    sourcesCited: [
+-      { url: "https://bloomberg.com/22", title: "Bloomberg Media" },
+-    ],
+-    model: "claude-3-5-sonnet-20241022",
+-    tokensUsed: 350,
+-    aiStatement: "AI-generated summary with source citation.",
+-    coveragePercentage: 84,
+-    originalArticleUrl: "https://onestop.news/article/22",
+-  },
+-  {
+-    summaryText:
+-      "A cyberattack on a major payment processor affected 30 million customers, exposing personal and financial data in one of the largest breaches in recent years.",
+-    keyPoints: [
+-      "30 million customers affected",
+-      "Major payment processor breached",
+-      "Largest breach in recent years",
+-    ],
+-    sourcesCited: [{ url: "https://reuters.com/30", title: "Reuters Cyber" }],
+-    model: "claude-3-5-sonnet-20241022",
+-    tokensUsed: 370,
+-    aiStatement: "AI-generated summary. Verify with original sources.",
+-    coveragePercentage: 88,
+-    originalArticleUrl: "https://onestop.news/article/30",
+-  },
++  { summaryText: "Global stock markets surged after G7 inflation data showed cooling for the third consecutive month, giving central banks room to ease monetary policy. Major indices including the S&P 500, FTSE 100, and Nikkei 225 posted significant gains.", keyPoints: ["G7 inflation cooled for third straight month", "Central banks may ease policy in Q3", "S&P 500, FTSE 100, Nikkei all gained"], sourcesCited: [{ url: "https://bloomberg.com/1", title: "Bloomberg Markets" }, { url: "https://reuters.com/1", title: "Reuters Business" }], model: "claude-3-5-sonnet-20241022", tokensUsed: 482, aiStatement: "This summary was generated by AI with source citation. Always verify with original articles.", coveragePercentage: 87, originalArticleUrl: "https://onestop.news/article/1" },
++  { summaryText: "The European Parliament passed the AI Act enforcement framework with 142 votes in favor, establishing oversight mechanisms for artificial intelligence systems in the EU.", keyPoints: ["142 votes in favor, 37 against", "Framework establishes AI oversight in EU", "Penalties up to 4% of global turnover"], sourcesCited: [{ url: "https://reuters.com/2", title: "Reuters Europe" }], model: "claude-3-5-sonnet-20241022", tokensUsed: 356, aiStatement: "AI-generated summary. Please verify facts with original sources.", coveragePercentage: 92, originalArticleUrl: "https://onestop.news/article/2" },
++  { summaryText: "SpaceX successfully completed the first orbital refueling test of its Starship vehicle, a critical milestone for future lunar and Mars missions. The demonstration involved two Starship vehicles docked in orbit.", keyPoints: ["First orbital refueling test completed", "Two Starship vehicles docked in orbit", "Critical for lunar and Mars missions"], sourcesCited: [{ url: "https://apnews.com/3", title: "AP Science" }], model: "claude-3-5-sonnet-20241022", tokensUsed: 410, aiStatement: "AI-generated summary with source citation.", coveragePercentage: 85, originalArticleUrl: "https://onestop.news/article/3" },
++  { summaryText: "Apple introduced a new on-device AI framework that integrates with the App Store, allowing third-party apps to access Apple Intelligence models locally on iPhone and Mac without sending data to the cloud.", keyPoints: ["On-device AI framework announced", "Integrates with App Store", "Local processing on iPhone and Mac"], sourcesCited: [{ url: "https://theverge.com/4", title: "The Verge" }], model: "claude-3-5-sonnet-20241022", tokensUsed: 390, aiStatement: "AI-generated summary. Verify with original sources.", coveragePercentage: 88, originalArticleUrl: "https://onestop.news/article/4" },
++  { summaryText: "The WHO declared a new mpox variant a public health emergency of international concern, unlocking emergency funding and coordinated response mechanisms as cases spread across Central Africa and neighboring regions.", keyPoints: ["New mpox variant declared emergency", "Cases spreading across Central Africa", "Emergency funding unlocked"], sourcesCited: [{ url: "https://reuters.com/5", title: "Reuters Health" }], model: "claude-3-5-sonnet-20241022", tokensUsed: 450, aiStatement: "AI-generated summary with source citation.", coveragePercentage: 90, originalArticleUrl: "https://onestop.news/article/5" },
++  { summaryText: "China announced a $40 billion semiconductor subsidy package targeting legacy chip manufacturing and advanced packaging, aiming to reduce dependence on foreign technology by 2030 amid ongoing export controls.", keyPoints: ["$40B semiconductor subsidy announced", "Targets legacy chips and advanced packaging", "Aims to reduce foreign dependence by 2030"], sourcesCited: [{ url: "https://reuters.com/9", title: "Reuters Technology" }], model: "claude-3-5-sonnet-20241022", tokensUsed: 420, aiStatement: "AI-generated summary. Verify with original sources.", coveragePercentage: 86, originalArticleUrl: "https://onestop.news/article/9" },
++  { summaryText: "The GE2025 campaign entered its final week with housing policy emerging as the key battleground. Candidates from major parties sharpened their positions on public housing supply and affordability for undecided voters.", keyPoints: ["Campaign enters final week", "Housing policy is key battleground", "Focus on supply and affordability"], sourcesCited: [{ url: "https://cna.com/8", title: "CNA" }], model: "claude-3-5-sonnet-20241022", tokensUsed: 370, aiStatement: "AI-generated summary with source citation.", coveragePercentage: 84, originalArticleUrl: "https://onestop.news/article/8" },
++  { summaryText: "The global chip shortage is easing as supply chains normalize, with automotive and consumer electronics manufacturers reporting stabilizing component availability after two years of constraints.", keyPoints: ["Chip shortage easing", "Supply chains normalizing", "Automotive and electronics stabilizing"], sourcesCited: [{ url: "https://techcrunch.com/11", title: "TechCrunch" }], model: "claude-3-5-sonnet-20241022", tokensUsed: 340, aiStatement: "AI-generated summary. Verify with original sources.", coveragePercentage: 82, originalArticleUrl: "https://onestop.news/article/11" },
++  { summaryText: "The UN Climate Panel warned of five irreversible tipping points that could trigger cascading climate effects within decades, urging immediate global action to prevent catastrophic outcomes.", keyPoints: ["Five critical tipping points identified", "Could trigger cascading climate effects", "Immediate action urged"], sourcesCited: [{ url: "https://reuters.com/13", title: "Reuters Environment" }], model: "claude-3-5-sonnet-20241022", tokensUsed: 400, aiStatement: "AI-generated summary with source citation.", coveragePercentage: 89, originalArticleUrl: "https://onestop.news/article/13" },
++  { summaryText: "Oil prices surged 8% after Middle East tensions escalated, causing disruption in the Strait of Hormuz, a critical shipping route for global crude oil transport.", keyPoints: ["Oil prices surged 8%", "Middle East tensions escalated", "Strait of Hormuz disrupted"], sourcesCited: [{ url: "https://bloomberg.com/15", title: "Bloomberg Energy" }], model: "claude-3-5-sonnet-20241022", tokensUsed: 310, aiStatement: "AI-generated summary. Verify with original sources.", coveragePercentage: 80, originalArticleUrl: "https://onestop.news/article/15" },
++  { summaryText: "A new COVID-19 variant was detected in Southeast Asia, with health authorities in Malaysia and Thailand reporting cases showing increased transmissibility.", keyPoints: ["New COVID-19 variant detected", "Found in Malaysia and Thailand", "Shows increased transmissibility"], sourcesCited: [{ url: "https://apnews.com/16", title: "AP Health" }], model: "claude-3-5-sonnet-20241022", tokensUsed: 320, aiStatement: "AI-generated summary with source citation.", coveragePercentage: 83, originalArticleUrl: "https://onestop.news/article/16" },
++  { summaryText: "ASEAN leaders reached a landmark trade agreement establishing a unified digital trade framework that will eliminate cross-border data tariffs among the 10-nation bloc.", keyPoints: ["Landmark digital trade agreement reached", "Eliminates cross-border data tariffs", "Covers 10 ASEAN nations"], sourcesCited: [{ url: "https://reuters.com/19", title: "Reuters Asia" }], model: "claude-3-5-sonnet-20241022", tokensUsed: 360, aiStatement: "AI-generated summary. Verify with original sources.", coveragePercentage: 87, originalArticleUrl: "https://onestop.news/article/19" },
++  { summaryText: "Tesla revealed next-generation battery technology using silicon anodes that promises a 50% range boost, offering 1,000km range on a single charge starting from 2027.", keyPoints: ["Silicon anode battery tech revealed", "50% range boost promised", "1,000km range from 2027"], sourcesCited: [{ url: "https://techcrunch.com/18", title: "TechCrunch" }], model: "claude-3-5-sonnet-20241022", tokensUsed: 330, aiStatement: "AI-generated summary with source citation.", coveragePercentage: 81, originalArticleUrl: "https://onestop.news/article/18" },
++  { summaryText: "Singapore launched its National AI Strategy 2.0, focusing on developing AI talent and infrastructure to position the city-state as a global AI hub by 2030.", keyPoints: ["National AI Strategy 2.0 launched", "Focus on talent and infrastructure", "Aims to be global AI hub by 2030"], sourcesCited: [{ url: "https://cna.com/21", title: "CNA" }], model: "claude-3-5-sonnet-20241022", tokensUsed: 340, aiStatement: "AI-generated summary. Verify with original sources.", coveragePercentage: 85, originalArticleUrl: "https://onestop.news/article/21" },
++  { summaryText: "Netflix reported record subscriber growth in Q2, adding 8.5 million subscribers and beating analyst expectations by 2 million, driven by the success of its ad-supported tier.", keyPoints: ["8.5 million subscribers added in Q2", "Beat expectations by 2 million", "Ad-supported tier driving growth"], sourcesCited: [{ url: "https://bloomberg.com/22", title: "Bloomberg Media" }], model: "claude-3-5-sonnet-20241022", tokensUsed: 350, aiStatement: "AI-generated summary with source citation.", coveragePercentage: 84, originalArticleUrl: "https://onestop.news/article/22" },
++  { summaryText: "A cyberattack on a major payment processor affected 30 million customers, exposing personal and financial data in one of the largest breaches in recent years.", keyPoints: ["30 million customers affected", "Major payment processor breached", "Largest breach in recent years"], sourcesCited: [{ url: "https://reuters.com/30", title: "Reuters Cyber" }], model: "claude-3-5-sonnet-20241022", tokensUsed: 370, aiStatement: "AI-generated summary. Verify with original sources.", coveragePercentage: 88, originalArticleUrl: "https://onestop.news/article/30" },
+ ];
+ 
+ // ─── Main Seed Function ────────────────────────────────────────────────────
+@@ -781,17 +128,11 @@ export async function seed() {
+   console.log(`  ✓ ${seedSources.length} sources`);
+ 
+   // Get generated IDs
+-  const allCategories = await db
+-    .select({ id: categories.id, slug: categories.slug })
+-    .from(categories);
+-  const allSources = await db
+-    .select({ id: sources.id, url: sources.url, name: sources.name })
+-    .from(sources);
++  const allCategories = await db.select({ id: categories.id, slug: categories.slug }).from(categories);
++  const allSources = await db.select({ id: sources.id, url: sources.url, name: sources.name }).from(sources);
+ 
+   const categoryMap = new Map(allCategories.map((c) => [c.slug, c.id]));
+-  const sourceMap = new Map(
+-    allSources.map((s) => [s.url, { id: s.id, name: s.name }]),
+-  );
++  const sourceMap = new Map(allSources.map((s) => [s.url, { id: s.id, name: s.name }]));
+ 
+   // Insert articles with resolved foreign keys
+   const articleValues = seedArticles.map((article, index) => {
+@@ -823,34 +164,28 @@ export async function seed() {
+   if (seedSummaries.length > 0) {
+     // Map article URLs to article IDs
+     const articleUrlToId = new Map<string, string>();
+-    for (const article of await db
+-      .select({ id: articles.id, canonicalUrl: articles.canonicalUrl })
+-      .from(articles)) {
++    for (const article of await db.select({ id: articles.id, canonicalUrl: articles.canonicalUrl }).from(articles)) {
+       articleUrlToId.set(article.canonicalUrl, article.id);
+     }
+ 
+-    const summaryValues = seedSummaries
+-      .map((summary) => {
+-        const articleId = articleUrlToId.get(summary.originalArticleUrl);
+-        if (!articleId) {
+-          console.warn(
+-            `  ⚠ No article found for summary: ${summary.originalArticleUrl}`,
+-          );
+-          return null;
+-        }
+-        return {
+-          articleId,
+-          summaryText: summary.summaryText,
+-          keyPoints: summary.keyPoints,
+-          sourcesCited: summary.sourcesCited,
+-          model: summary.model,
+-          tokensUsed: summary.tokensUsed,
+-          aiStatement: summary.aiStatement,
+-          coveragePercentage: summary.coveragePercentage,
+-          originalArticleUrl: summary.originalArticleUrl,
+-        };
+-      })
+-      .filter((s): s is NonNullable<typeof s> => s !== null);
++    const summaryValues = seedSummaries.map((summary) => {
++      const articleId = articleUrlToId.get(summary.originalArticleUrl);
++      if (!articleId) {
++        console.warn(`  ⚠ No article found for summary: ${summary.originalArticleUrl}`);
++        return null;
++      }
++      return {
++        articleId,
++        summaryText: summary.summaryText,
++        keyPoints: summary.keyPoints,
++        sourcesCited: summary.sourcesCited,
++        model: summary.model,
++        tokensUsed: summary.tokensUsed,
++        aiStatement: summary.aiStatement,
++        coveragePercentage: summary.coveragePercentage,
++        originalArticleUrl: summary.originalArticleUrl,
++      };
++    }).filter((s): s is NonNullable<typeof s> => s !== null);
+ 
+     if (summaryValues.length > 0) {
+       await db.insert(summaries).values(summaryValues).onConflictDoNothing();
+diff --git a/src/lib/env/index.ts b/src/lib/env/index.ts
+index 06387c1..aa63c43 100644
+--- a/src/lib/env/index.ts
++++ b/src/lib/env/index.ts
+@@ -13,7 +13,7 @@ export const envSchema = z.object({
+     .min(1, "DATABASE_URL is required")
+     .refine(
+       (val) => val.startsWith("postgres://") || val.startsWith("postgresql://"),
+-      "DATABASE_URL must start with postgres:// or postgresql://",
++      "DATABASE_URL must start with postgres:// or postgresql://"
+     ),
+ 
+   // ── Redis (BullMQ) ──────────────────────────────────────────────────────
+@@ -22,11 +22,13 @@ export const envSchema = z.object({
+     .min(1, "REDIS_URL is required")
+     .refine(
+       (val) => val.startsWith("redis://"),
+-      "REDIS_URL must start with redis://",
++      "REDIS_URL must start with redis://"
+     ),
+ 
+   // ── Auth.js ─────────────────────────────────────────────────────────────
+-  AUTH_SECRET: z.string().min(32, "AUTH_SECRET must be at least 32 characters"),
++  AUTH_SECRET: z
++    .string()
++    .min(32, "AUTH_SECRET must be at least 32 characters"),
+   AUTH_URL: z.string().min(1, "AUTH_URL is required"),
+ 
+   // ── AI Providers ────────────────────────────────────────────────────────
+@@ -35,14 +37,14 @@ export const envSchema = z.object({
+     .min(1, "ANTHROPIC_API_KEY is required")
+     .refine(
+       (val) => val.startsWith("sk-ant-"),
+-      "ANTHROPIC_API_KEY must start with sk-ant-",
++      "ANTHROPIC_API_KEY must start with sk-ant-"
+     ),
+   OPENAI_API_KEY: z
+     .string()
+     .min(1, "OPENAI_API_KEY is required")
+     .refine(
+       (val) => val.startsWith("sk-"),
+-      "OPENAI_API_KEY must start with sk-",
++      "OPENAI_API_KEY must start with sk-"
+     ),
+ 
+   // ── Push Notifications ──────────────────────────────────────────────────
+@@ -56,7 +58,7 @@ export const envSchema = z.object({
+     .length(64, "PUSH_KEY_ENCRYPTION_KEY must be exactly 64 hex characters")
+     .refine(
+       (val) => /^[0-9a-fA-F]{64}$/.test(val),
+-      "PUSH_KEY_ENCRYPTION_KEY must be 64 hex characters",
++      "PUSH_KEY_ENCRYPTION_KEY must be 64 hex characters"
+     ),
+ 
+   // ── OAuth Providers (optional) ──────────────────────────────────────────
+@@ -139,6 +141,6 @@ if (env.NODE_ENV === "production" && env.TRUSTED_PROXY !== "true") {
+     "[env] WARNING: NODE_ENV=production but TRUSTED_PROXY is not set to 'true'.\n" +
+       "  The rate limiter will use the leftmost (client-supplied) X-Forwarded-For IP,\n" +
+       "  which is spoofable. Set TRUSTED_PROXY=true if behind a CDN/reverse proxy.\n" +
+-      "  For finer-grained control, also set TRUSTED_PROXY_CIDRS to walk the proxy chain.",
++      "  For finer-grained control, also set TRUSTED_PROXY_CIDRS to walk the proxy chain."
+   );
+ }
+diff --git a/src/lib/queue/flows.test.ts b/src/lib/queue/flows.test.ts
+index a51091f..69e7437 100644
+--- a/src/lib/queue/flows.test.ts
++++ b/src/lib/queue/flows.test.ts
+@@ -86,7 +86,7 @@ describe("enqueuePostIngestFlow", () => {
+     expect(flowTree.data).toEqual(
+       expect.objectContaining({
+         categoryId: "cat-42",
+-      }),
++      })
+     );
+   });
+ 
+@@ -117,7 +117,7 @@ describe("enqueuePostIngestFlow", () => {
+       expect.objectContaining({
+         status: "skipped",
+         enqueuedCount: 0,
+-      }),
++      })
+     );
+     expect(mockFlowAdd).not.toHaveBeenCalled();
+   });
+@@ -143,7 +143,7 @@ describe("enqueuePostIngestFlow", () => {
+         status: "ok",
+         fallbackUsed: false,
+         enqueuedCount: 1,
+-      }),
++      })
+     );
+   });
+ });
+@@ -166,7 +166,7 @@ describe("enqueuePostIngestFlow — Redis failure resilience (Critical C4)", ()
+       enqueuePostIngestFlow({
+         newArticleIds: ["art-1", "art-2"],
+         categoryId: "cat-1",
+-      }),
++      })
+     ).resolves.toBeDefined();
+   });
+ 
+@@ -182,15 +182,9 @@ describe("enqueuePostIngestFlow — Redis failure resilience (Critical C4)", ()
+     // This is less atomic (no parent-waits-for-children guarantee) but
+     // ensures scoring happens at all, vs. silent data loss.
+     expect(scoreQueue.add).toHaveBeenCalledTimes(3);
+-    expect(scoreQueue.add).toHaveBeenCalledWith("score-article", {
+-      articleId: "art-1",
+-    });
+-    expect(scoreQueue.add).toHaveBeenCalledWith("score-article", {
+-      articleId: "art-2",
+-    });
+-    expect(scoreQueue.add).toHaveBeenCalledWith("score-article", {
+-      articleId: "art-3",
+-    });
++    expect(scoreQueue.add).toHaveBeenCalledWith("score-article", { articleId: "art-1" });
++    expect(scoreQueue.add).toHaveBeenCalledWith("score-article", { articleId: "art-2" });
++    expect(scoreQueue.add).toHaveBeenCalledWith("score-article", { articleId: "art-3" });
+   });
+ 
+   it("returns status=degraded when fallback is used", async () => {
+@@ -205,7 +199,7 @@ describe("enqueuePostIngestFlow — Redis failure resilience (Critical C4)", ()
+       expect.objectContaining({
+         status: "degraded",
+         fallbackUsed: true,
+-      }),
++      })
+     );
+   });
+ 
+@@ -219,7 +213,7 @@ describe("enqueuePostIngestFlow — Redis failure resilience (Critical C4)", ()
+       expect.objectContaining({
+         status: "ok",
+         fallbackUsed: false,
+-      }),
++      })
+     );
+   });
+ 
+diff --git a/src/lib/queue/flows.ts b/src/lib/queue/flows.ts
+index a2a232e..12ad0de 100644
+--- a/src/lib/queue/flows.ts
++++ b/src/lib/queue/flows.ts
+@@ -92,7 +92,7 @@ export function getFlowProducer(): FlowProducer {
+  *          the fallback was used (and how many fallback failures occurred)
+  */
+ export async function enqueuePostIngestFlow(
+-  input: PostIngestFlowInput,
++  input: PostIngestFlowInput
+ ): Promise<PostIngestFlowStatus> {
+   // Edge case: no new articles. Nothing to do.
+   if (input.newArticleIds.length === 0) {
+@@ -147,7 +147,7 @@ export async function enqueuePostIngestFlow(
+     // The feed-slice cache will be refreshed on the next ingest cycle.
+     console.error(
+       "[FlowProducer] Atomic flow enqueue failed. Falling back to direct scoreQueue.add() per article.",
+-      flowError,
++      flowError
+     );
+ 
+     let fallbackFailures = 0;
+@@ -158,7 +158,7 @@ export async function enqueuePostIngestFlow(
+         fallbackFailures += 1;
+         console.error(
+           `[FlowProducer] Fallback scoreQueue.add() also failed for article ${articleId}.`,
+-          perArticleError,
++          perArticleError
+         );
+       }
+     }
+diff --git a/src/lib/security/encrypt.ts b/src/lib/security/encrypt.ts
+index 7d8207f..72a58cc 100644
+--- a/src/lib/security/encrypt.ts
++++ b/src/lib/security/encrypt.ts
+@@ -44,10 +44,7 @@ const KEY_BUFFER = Buffer.from(env.PUSH_KEY_ENCRYPTION_KEY, "hex");
+  * @param keys — { p256dh, auth } from the PushSubscription keys
+  * @returns Hex-encoded encrypted string
+  */
+-export function encryptPushKeys(keys: {
+-  p256dh: string;
+-  auth: string;
+-}): string {
++export function encryptPushKeys(keys: { p256dh: string; auth: string }): string {
+   const iv = randomBytes(16);
+   const cipher = createCipheriv(ALGORITHM, KEY_BUFFER, iv);
+ 
+@@ -65,10 +62,7 @@ export function encryptPushKeys(keys: {
+  * @param encryptedString — Format: ${iv}:${authTag}:${encryptedData}
+  * @returns Original { p256dh, auth } object
+  */
+-export function decryptPushKeys(encryptedString: string): {
+-  p256dh: string;
+-  auth: string;
+-} {
++export function decryptPushKeys(encryptedString: string): { p256dh: string; auth: string } {
+   const [ivHex, authTagHex, encryptedHex] = encryptedString.split(":");
+ 
+   if (!ivHex || !authTagHex || !encryptedHex) {
+@@ -78,7 +72,7 @@ export function decryptPushKeys(encryptedString: string): {
+   const decipher = createDecipheriv(
+     ALGORITHM,
+     KEY_BUFFER,
+-    Buffer.from(ivHex, "hex"),
++    Buffer.from(ivHex, "hex")
+   );
+ 
+   decipher.setAuthTag(Buffer.from(authTagHex, "hex"));
+diff --git a/src/shared/components/layout/Header.test.tsx b/src/shared/components/layout/Header.test.tsx
+index 4baef28..65d25c5 100644
+--- a/src/shared/components/layout/Header.test.tsx
++++ b/src/shared/components/layout/Header.test.tsx
+@@ -6,13 +6,9 @@ import { Header, CATEGORIES } from "./Header";
+ // Mock next-auth/react so useSession() works without a SessionProvider
+ // wrapper in every test. UserMenu reads session state via useSession.
+ vi.mock("next-auth/react", () => ({
+-  useSession: vi
+-    .fn()
+-    .mockReturnValue({ data: null, status: "unauthenticated" }),
++  useSession: vi.fn().mockReturnValue({ data: null, status: "unauthenticated" }),
+   signOut: vi.fn().mockImplementation(async () => Promise.resolve()),
+-  SessionProvider: ({ children }: { children: React.ReactNode }) => (
+-    <>{children}</>
+-  ),
++  SessionProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+ }));
+ 
+ describe("Header", () => {
+diff --git a/src/shared/components/layout/Header.tsx b/src/shared/components/layout/Header.tsx
+index f4a7ed6..66679e7 100644
+--- a/src/shared/components/layout/Header.tsx
++++ b/src/shared/components/layout/Header.tsx
+@@ -22,48 +22,13 @@ import { UserMenu } from "./UserMenu";
+ 
+ /* ─── Category Configuration ───────────────────────────────────────────── */
+ export const CATEGORIES = [
+-  {
+-    slug: "top-stories",
+-    name: "Top Stories",
+-    colourClass: "bg-dispatch-ember",
+-    activeBorder: "border-dispatch-ember",
+-  },
+-  {
+-    slug: "local",
+-    name: "Local",
+-    colourClass: "bg-dispatch-clay",
+-    activeBorder: "border-dispatch-clay",
+-  },
+-  {
+-    slug: "tech",
+-    name: "Tech",
+-    colourClass: "bg-dispatch-slate",
+-    activeBorder: "border-dispatch-slate",
+-  },
+-  {
+-    slug: "global",
+-    name: "Global",
+-    colourClass: "bg-dispatch-slate",
+-    activeBorder: "border-dispatch-slate",
+-  },
+-  {
+-    slug: "finance",
+-    name: "Finance",
+-    colourClass: "bg-dispatch-sage",
+-    activeBorder: "border-dispatch-sage",
+-  },
+-  {
+-    slug: "politics",
+-    name: "Politics",
+-    colourClass: "bg-dispatch-clay",
+-    activeBorder: "border-dispatch-clay",
+-  },
+-  {
+-    slug: "culture",
+-    name: "Culture",
+-    colourClass: "bg-dispatch-violet",
+-    activeBorder: "border-dispatch-violet",
+-  },
++  { slug: "top-stories",  name: "Top Stories",  colourClass: "bg-dispatch-ember",  activeBorder: "border-dispatch-ember" },
++  { slug: "local",        name: "Local",        colourClass: "bg-dispatch-clay",   activeBorder: "border-dispatch-clay" },
++  { slug: "tech",         name: "Tech",         colourClass: "bg-dispatch-slate",  activeBorder: "border-dispatch-slate" },
++  { slug: "global",       name: "Global",       colourClass: "bg-dispatch-slate",  activeBorder: "border-dispatch-slate" },
++  { slug: "finance",      name: "Finance",      colourClass: "bg-dispatch-sage",   activeBorder: "border-dispatch-sage" },
++  { slug: "politics",     name: "Politics",     colourClass: "bg-dispatch-clay",   activeBorder: "border-dispatch-clay" },
++  { slug: "culture",      name: "Culture",      colourClass: "bg-dispatch-violet", activeBorder: "border-dispatch-violet" },
+ ];
+ 
+ /* ─── Component Interface ─────────────────────────────────────────────── */
+@@ -74,10 +39,7 @@ export interface HeaderProps {
+ }
+ 
+ /* ─── Component ───────────────────────────────────────────────────────── */
+-export function Header({
+-  activeCategory: activeCategoryProp,
+-  className,
+-}: HeaderProps) {
++export function Header({ activeCategory: activeCategoryProp, className }: HeaderProps) {
+   const [mobileOpen, setMobileOpen] = useState(false);
+   const pathname = usePathname();
+ 
+@@ -93,7 +55,7 @@ export function Header({
+     <header
+       className={cn(
+         "sticky top-0 z-40 bg-paper-50/95 backdrop-blur-sm border-b border-paper-200",
+-        className,
++        className
+       )}
+     >
+       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
+@@ -128,18 +90,8 @@ export function Header({
+             aria-label="Open menu"
+             aria-expanded={mobileOpen}
+           >
+-            <svg
+-              className="h-5 w-5"
+-              fill="none"
+-              stroke="currentColor"
+-              strokeWidth={2}
+-              viewBox="0 0 24 24"
+-            >
+-              <path
+-                strokeLinecap="round"
+-                strokeLinejoin="round"
+-                d="M4 6h16M4 12h16M4 18h16"
+-              />
++            <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
++              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+             </svg>
+           </button>
+         </div>
+@@ -160,16 +112,13 @@ export function Header({
+                   "flex items-center gap-2 px-3 py-1.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors duration-150 rounded-t-sm",
+                   isActive
+                     ? `${cat.activeBorder} text-ink-900 bg-dispatch-ember-light/40`
+-                    : "border-transparent text-ink-600 hover:text-ink-900 hover:bg-paper-100",
++                    : "border-transparent text-ink-600 hover:text-ink-900 hover:bg-paper-100"
+                 )}
+                 role="tab"
+                 aria-selected={isActive}
+               >
+                 <span
+-                  className={cn(
+-                    "w-2 h-2 rounded-full shrink-0",
+-                    cat.colourClass,
+-                  )}
++                  className={cn("w-2 h-2 rounded-full shrink-0", cat.colourClass)}
+                   aria-hidden="true"
+                 />
+                 {cat.name}
+@@ -196,18 +145,8 @@ export function Header({
+                   className="inline-flex h-9 w-9 items-center justify-center rounded-sm text-ink-400 hover:bg-paper-100 hover:text-ink-900 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dispatch-ember focus-visible:ring-offset-2 focus-visible:ring-offset-paper-50"
+                   aria-label="Close menu"
+                 >
+-                  <svg
+-                    className="h-5 w-5"
+-                    fill="none"
+-                    stroke="currentColor"
+-                    strokeWidth={2}
+-                    viewBox="0 0 24 24"
+-                  >
+-                    <path
+-                      strokeLinecap="round"
+-                      strokeLinejoin="round"
+-                      d="M6 18L18 6M6 6l12 12"
+-                    />
++                  <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
++                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                   </svg>
+                 </button>
+               </Dialog.Close>
+@@ -225,14 +164,11 @@ export function Header({
+                       "flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-sm transition-colors duration-150",
+                       isActive
+                         ? "bg-dispatch-ember-light/40 text-ink-900"
+-                        : "text-ink-600 hover:bg-paper-100 hover:text-ink-900",
++                        : "text-ink-600 hover:bg-paper-100 hover:text-ink-900"
+                     )}
+                   >
+                     <span
+-                      className={cn(
+-                        "w-2 h-2 rounded-full shrink-0",
+-                        cat.colourClass,
+-                      )}
++                      className={cn("w-2 h-2 rounded-full shrink-0", cat.colourClass)}
+                       aria-hidden="true"
+                     />
+                     {cat.name}
+diff --git a/src/shared/components/layout/UserMenu.test.tsx b/src/shared/components/layout/UserMenu.test.tsx
+index 424910c..64f9abd 100644
+--- a/src/shared/components/layout/UserMenu.test.tsx
++++ b/src/shared/components/layout/UserMenu.test.tsx
+@@ -20,9 +20,7 @@ const mockSignOut = vi.fn().mockImplementation(async () => Promise.resolve());
+ vi.mock("next-auth/react", () => ({
+   useSession: mockUseSession,
+   signOut: mockSignOut,
+-  SessionProvider: ({ children }: { children: React.ReactNode }) => (
+-    <>{children}</>
+-  ),
++  SessionProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+ }));
+ 
+ // Import after mocks are registered.
+@@ -51,14 +49,7 @@ describe("UserMenu — unauthenticated state", () => {
+ describe("UserMenu — authenticated state", () => {
+   it("renders 'Sign Out' button when session is present", () => {
+     mockUseSession.mockReturnValue({
+-      data: {
+-        user: {
+-          id: "u1",
+-          name: "Alice",
+-          email: "alice@example.com",
+-          role: "reader",
+-        },
+-      },
++      data: { user: { id: "u1", name: "Alice", email: "alice@example.com", role: "reader" } },
+       status: "authenticated",
+     });
+     render(<UserMenu />);
+@@ -67,14 +58,7 @@ describe("UserMenu — authenticated state", () => {
+ 
+   it("does not render Sign In link when authenticated", () => {
+     mockUseSession.mockReturnValue({
+-      data: {
+-        user: {
+-          id: "u1",
+-          name: "Alice",
+-          email: "alice@example.com",
+-          role: "reader",
+-        },
+-      },
++      data: { user: { id: "u1", name: "Alice", email: "alice@example.com", role: "reader" } },
+       status: "authenticated",
+     });
+     render(<UserMenu />);
+@@ -83,14 +67,7 @@ describe("UserMenu — authenticated state", () => {
+ 
+   it("Sign Out button has focus-visible:ring-* classes (WCAG AAA)", () => {
+     mockUseSession.mockReturnValue({
+-      data: {
+-        user: {
+-          id: "u1",
+-          name: "Alice",
+-          email: "alice@example.com",
+-          role: "reader",
+-        },
+-      },
++      data: { user: { id: "u1", name: "Alice", email: "alice@example.com", role: "reader" } },
+       status: "authenticated",
+     });
+     render(<UserMenu />);
+diff --git a/src/shared/components/ui/Accordion.test.tsx b/src/shared/components/ui/Accordion.test.tsx
+index bb133f4..15ca677 100644
+--- a/src/shared/components/ui/Accordion.test.tsx
++++ b/src/shared/components/ui/Accordion.test.tsx
+@@ -7,16 +7,12 @@ describe("FaqAccordion", () => {
+     const { container } = render(<FaqAccordion />);
+     expect(container.textContent).toContain("What is the AI Nutrition Label?");
+     expect(container.textContent).toContain("How are articles summarised?");
+-    expect(container.textContent).toContain(
+-      "What sources does OneStopNews use?",
+-    );
++    expect(container.textContent).toContain("What sources does OneStopNews use?");
+   });
+ 
+   it("renders the FAQ heading", () => {
+     render(<FaqAccordion />);
+-    expect(
+-      screen.queryByRole("heading", { name: /Frequently Asked/ }),
+-    ).toBeDefined();
++    expect(screen.queryByRole("heading", { name: /Frequently Asked/ })).toBeDefined();
+   });
+ 
+   // ── Phase 19 (H1): Focus rings on accordion triggers ─────────────────────
+@@ -31,4 +27,4 @@ describe("FaqAccordion", () => {
+       expect(trigger.className).toMatch(/focus-visible:ring/);
+     }
+   });
+-});
++});
+\ No newline at end of file
+diff --git a/src/shared/components/ui/Button.tsx b/src/shared/components/ui/Button.tsx
+index 05934db..d4314be 100644
+--- a/src/shared/components/ui/Button.tsx
++++ b/src/shared/components/ui/Button.tsx
+@@ -14,8 +14,8 @@ import { cn } from "@/shared/lib/utils";
+ const buttonVariants = cva(
+   /* Base styles — shared across all variants */
+   "inline-flex items-center justify-center gap-2 rounded-sm font-ui font-medium text-sm transition-all duration-150 ease-out " +
+-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dispatch-ember focus-visible:ring-offset-2 focus-visible:ring-offset-paper-50 " +
+-    "disabled:pointer-events-none disabled:opacity-50",
++  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dispatch-ember focus-visible:ring-offset-2 focus-visible:ring-offset-paper-50 " +
++  "disabled:pointer-events-none disabled:opacity-50",
+   {
+     variants: {
+       variant: {
+@@ -46,7 +46,7 @@ const buttonVariants = cva(
+       variant: "primary",
+       size: "md",
+     },
+-  },
++  }
+ );
+ 
+ /* ─── Spinner Sub-component ─────────────────────────────────────────────── */
+@@ -78,8 +78,7 @@ function ButtonSpinner({ className }: { className?: string }) {
+ 
+ /* ─── Component Interface ─────────────────────────────────────────────── */
+ export interface ButtonProps
+-  extends
+-    React.ButtonHTMLAttributes<HTMLButtonElement>,
++  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+     VariantProps<typeof buttonVariants> {
+   asChild?: boolean;
+   isLoading?: boolean;
+@@ -98,7 +97,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+       children,
+       ...props
+     },
+-    ref,
++    ref
+   ) => {
+     const Comp = asChild ? Slot : "button";
+ 
+@@ -113,7 +112,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+         {children}
+       </Comp>
+     );
+-  },
++  }
+ );
+ Button.displayName = "Button";
+ 
+diff --git a/src/shared/components/ui/NewsletterCTA.test.tsx b/src/shared/components/ui/NewsletterCTA.test.tsx
+index d02d931..b9b21c6 100644
+--- a/src/shared/components/ui/NewsletterCTA.test.tsx
++++ b/src/shared/components/ui/NewsletterCTA.test.tsx
+@@ -100,10 +100,8 @@ describe("NewsletterCTA", () => {
+     expect(() => {
+       const form = button.closest("form")!;
+       // Manually call handleSubmit with empty value (bypassing required check)
+-      fireEvent.change(screen.getByLabelText("Email address"), {
+-        target: { value: "" },
+-      });
++      fireEvent.change(screen.getByLabelText("Email address"), { target: { value: "" } });
+       fireEvent.submit(form);
+     }).not.toThrow();
+   });
+-});
++});
+\ No newline at end of file
+diff --git a/src/workers/index.ts b/src/workers/index.ts
+index 77a05ff..1508268 100644
+--- a/src/workers/index.ts
++++ b/src/workers/index.ts
+@@ -1,6 +1,8 @@
+ import { Worker } from "bullmq";
+ import { eq, sql } from "drizzle-orm";
+-import { createWorkerConnection } from "@/lib/queue";
++import {
++  createWorkerConnection,
++} from "@/lib/queue";
+ import { enqueuePostIngestFlow } from "@/lib/queue/flows";
+ import { db } from "@/lib/db";
+ import { articles, sources, summaries } from "@/lib/db/schema";
+@@ -15,9 +17,9 @@ import { publishCacheInvalidation } from "./lib/cacheInvalidation";
+ 
+ // ─── WORKER CONCURRENCY (per PAD §6.2) ──────────────────────────────────────
+ const CONCURRENCY = {
+-  ingest: 50, // I/O-bound: network fetches to RSS sources
+-  summarize: 5, // AI-API-bound: rate-limited by Anthropic/OpenAI
+-  score: 20, // CPU/DB-bound: scoring formula is fast
++  ingest: 50,    // I/O-bound: network fetches to RSS sources
++  summarize: 5,  // AI-API-bound: rate-limited by Anthropic/OpenAI
++  score: 20,     // CPU/DB-bound: scoring formula is fast
+   feedSlice: 10, // Redis writes: fast but connection pool limited
+ } as const;
+ 
+@@ -54,10 +56,7 @@ async function processIngestJob(job: {
+ 
+     const feedContent = await response.text();
+     // parseFeed is async (rss-parser uses async XML parsing)
+-    const parsedItems: FeedItem[] = await parseFeed(
+-      feedContent,
+-      source.feedFormat,
+-    );
++    const parsedItems: FeedItem[] = await parseFeed(feedContent, source.feedFormat);
+     let newArticlesCount = 0;
+     const newArticleIds: string[] = [];
+ 
+@@ -75,7 +74,7 @@ async function processIngestJob(job: {
+       const contentHash = hashContent(
+         item.title,
+         item.body ?? null,
+-        item.publishedAt ?? new Date(),
++        item.publishedAt ?? new Date()
+       );
+ 
+       // Upsert article (idempotent via canonicalUrl).
+@@ -265,9 +264,7 @@ async function processSummarizeJob(job: {
+     console.error(
+       `[Summarize] Failed (attempt ${attemptsMade + 1}/${maxAttempts}) for article ${articleId}:`,
+       error,
+-      failureState.flagReason
+-        ? `→ Marked as ${failureState.summaryStatus}: ${failureState.flagReason}`
+-        : "→ Will retry",
++      failureState.flagReason ? `→ Marked as ${failureState.summaryStatus}: ${failureState.flagReason}` : "→ Will retry"
+     );
+ 
+     throw error;
+@@ -453,7 +450,7 @@ async function main() {
+   console.log(
+     `[Worker] All workers running with concurrency: ingest=${CONCURRENCY.ingest}, ` +
+       `summarize=${CONCURRENCY.summarize}, score=${CONCURRENCY.score}, feedSlice=${CONCURRENCY.feedSlice}. ` +
+-      `Press Ctrl+C to stop.`,
++      `Press Ctrl+C to stop.`
+   );
+ }
+ 
+diff --git a/src/workers/jobs/alerts.test.ts b/src/workers/jobs/alerts.test.ts
+index 6db2b5e..23ed0d0 100644
+--- a/src/workers/jobs/alerts.test.ts
++++ b/src/workers/jobs/alerts.test.ts
+@@ -23,8 +23,7 @@ vi.mock("@/lib/db", () => ({
+ }));
+ 
+ // Import after mocks are registered.
+-const { checkNeedsReviewAlert, DEFAULT_ALERT_THRESHOLD } =
+-  await import("./alerts");
++const { checkNeedsReviewAlert, DEFAULT_ALERT_THRESHOLD } = await import("./alerts");
+ 
+ beforeEach(() => {
+   vi.clearAllMocks();
+@@ -63,9 +62,7 @@ describe("checkNeedsReviewAlert", () => {
+   });
+ 
+   it("logs to console.warn when alerting (default alerting mechanism)", async () => {
+-    const warnSpy = vi
+-      .spyOn(console, "warn")
+-      .mockImplementation(() => undefined);
++    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+     mockCountResult.mockReturnValue(5);
+     await checkNeedsReviewAlert();
+     expect(warnSpy).toHaveBeenCalled();
+@@ -80,8 +77,6 @@ describe("checkNeedsReviewAlert", () => {
+     mockCountResult.mockReturnValue(5);
+     const result = await checkNeedsReviewAlert({ alert: alertCallback });
+     expect(result.alerted).toBe(true);
+-    expect(alertCallback).toHaveBeenCalledWith(
+-      expect.objectContaining({ count: 5 }),
+-    );
++    expect(alertCallback).toHaveBeenCalledWith(expect.objectContaining({ count: 5 }));
+   });
+ });
+diff --git a/src/workers/jobs/alerts.ts b/src/workers/jobs/alerts.ts
+index a25da50..508d069 100644
+--- a/src/workers/jobs/alerts.ts
++++ b/src/workers/jobs/alerts.ts
+@@ -46,7 +46,7 @@ export interface NeedsReviewAlertOptions {
+  *          or chain additional actions.
+  */
+ export async function checkNeedsReviewAlert(
+-  options: NeedsReviewAlertOptions = {},
++  options: NeedsReviewAlertOptions = {}
+ ): Promise<NeedsReviewAlertResult> {
+   const threshold = options.threshold ?? DEFAULT_ALERT_THRESHOLD;
+   const alertFn = options.alert ?? defaultAlert;
+@@ -82,10 +82,6 @@ export async function checkNeedsReviewAlert(
+  * Production deployments should override this with an email/webhook/Slack
+  * integration by passing a custom `alert` option to checkNeedsReviewAlert.
+  */
+-function defaultAlert(info: {
+-  count: number;
+-  threshold: number;
+-  message: string;
+-}): void {
++function defaultAlert(info: { count: number; threshold: number; message: string }): void {
+   console.warn(`[ALERT] ${info.message}`);
+ }
+diff --git a/src/workers/jobs/parseFeed.ts b/src/workers/jobs/parseFeed.ts
+index 913b567..086f9fb 100644
+--- a/src/workers/jobs/parseFeed.ts
++++ b/src/workers/jobs/parseFeed.ts
+@@ -98,7 +98,7 @@ interface JsonFeedItem {
+  */
+ export async function parseFeed(
+   content: string,
+-  feedFormat: FeedFormat,
++  feedFormat: FeedFormat
+ ): Promise<FeedItem[]> {
+   if (feedFormat === "json_api") {
+     return parseJsonFeed(content);
+@@ -118,9 +118,8 @@ async function parseXmlFeed(content: string): Promise<FeedItem[]> {
+     // in some versions). We detect by inspecting the raw XML root element:
+     //   - <feed ...> → Atom
+     //   - <rss ...> or <rdf:RDF ...> → RSS
+-    const isAtom =
+-      /^\s*<\?xml[^>]*\?>\s*<feed[\s>]/i.test(content) ||
+-      /^\s*<feed[\s>]/i.test(content.trim());
++    const isAtom = /^\s*<\?xml[^>]*\?>\s*<feed[\s>]/i.test(content) ||
++                   /^\s*<feed[\s>]/i.test(content.trim());
+ 
+     const items: FeedItem[] = [];
+     for (const raw of rawItems) {
+@@ -182,9 +181,7 @@ function parseJsonFeed(content: string): FeedItem[] {
+       if (!raw.url) continue;
+ 
+       // Body: prefer content_text (plain), fall back to content_html (strip tags)
+-      const body =
+-        raw.content_text ??
+-        (raw.content_html ? stripHtml(raw.content_html) : undefined);
++      const body = raw.content_text ?? (raw.content_html ? stripHtml(raw.content_html) : undefined);
+ 
+       const publishedAt = parseDate(raw.date_published);
+ 

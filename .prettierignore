@@ -1,0 +1,74 @@
+# .prettierignore — Phase 22 (N6 fix, audit Report 16)
+#
+# Previously `pnpm format:check` scanned all 226+ markdown files outside src/,
+# causing spurious CI failures when historical docs (which have their own
+# formatting conventions) didn't match Prettier's defaults. This file
+# scopes formatting enforcement to source code + active config files only.
+#
+# Format is the same as .gitignore — patterns are matched against file paths.
+
+# ── Dependencies & build output ──────────────────────────────────────────
+node_modules/
+.next/
+dist/
+coverage/
+.pnpm-store/
+
+# ── Lockfiles (machine-generated, do not reformat) ───────────────────────
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# ── Generated DB migrations (Drizzle-managed) ────────────────────────────
+drizzle/meta/
+
+# ── Vendored third-party skills (not our code) ───────────────────────────
+skills/
+
+# ── Historical documentation archive ─────────────────────────────────────
+# These markdown files are historical records with their own formatting
+# conventions. Reformatting them would create noise in git blame without
+# improving readability. Active docs (README.md, AGENTS.md, CLAUDE.md,
+# MASTER_EXECUTION_PLAN.md, Codebase_Review_Validation_Report_*.md) at the
+# repo root are NOT excluded — they should be kept formatted.
+docs/
+*.archived
+*.backup
+*.bak
+
+# ── Tarball / archive artifacts ──────────────────────────────────────────
+*.tar.gz
+*.tar.bz2
+*.tgz
+*.zip
+
+# ── E2E test fixtures & Playwright config ────────────────────────────────
+e2e/
+playwright-report/
+playwright/.cache/
+
+# ── Environment files (do not reformat placeholder values) ───────────────
+.env
+.env.*
+!.env.example
+
+# ── Sample/mockup HTML files in docs/ (already excluded by docs/ above) ──
+
+# ── Misc config that should not be touched ──────────────────────────────
+.gitignore
+.gitattributes
+.husky/
+.github/
+
+# ── Image / binary assets ────────────────────────────────────────────────
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+*.woff
+*.woff2
+*.ttf
+*.otf
+*.eot

@@ -1,0 +1,14 @@
+README.md
+plan_PRD.md
+Project_Requirements_Document.md
+plan_PAD.md
+Project_Architecture_Document.md
+mockup-static-1/index.html
+mockup-static-1/landing.css
+mockup-static-1/landing.js
+mockup-static-2/index.html
+mockup-static-2/landing.css
+mockup-static-2/landing.js
+mockup-static-orig/app.js
+mockup-static-orig/index.html
+mockup-static-orig/styles.css

@@ -1,0 +1,195 @@
+# =============================================================================
+# OneStopNews — Sample Development Compose
+# =============================================================================
+# A minimal, working sample for trying OneStopNews locally with Docker.
+# Topology: PostgreSQL 17 + Redis 7 + Next.js 16 web + BullMQ worker.
+#
+# Usage:
+#   1. cp .env.example .env.docker   (then fill in real secrets — at minimum
+#      AUTH_SECRET, ANTHROPIC_API_KEY, OPENAI_API_KEY, VAPID_*,
+#      PUSH_KEY_ENCRYPTION_KEY; see README.md §Environment Variables)
+#   2. docker compose -f docker-compose-sample.yml up -d
+#   3. docker compose -f docker-compose-sample.yml exec web pnpm db:migrate
+#   4. docker compose -f docker-compose-sample.yml exec web pnpm db:seed
+#   5. Open http://localhost:3000
+#
+# For HTTPS termination in front of this stack, layer the optional
+# docker-compose-nginx.yml override on top:
+#   docker compose -f docker-compose-sample.yml -f docker-compose-nginx.yml up -d
+#
+# For production deployment, use docker-compose.prod.yml instead — it uses
+# production Dockerfiles (Dockerfile.web + Dockerfile.worker), a 1gb Redis
+# memory limit, and passes through OAuth + TRUSTED_PROXY env vars.
+#
+# References:
+#   - docker-compose-dev.yml   : full-featured dev compose (same topology)
+#   - docker-compose.prod.yml  : production compose
+#   - docker-compose-nginx.yml : HTTPS proxy override
+#   - scripts/init-extensions.sql : PostgreSQL extensions bootstrap
+# =============================================================================
+
+networks:
+  onestopnews-network:
+    driver: bridge
+
+services:
+  # ==========================================================================
+  # PostgreSQL 17 — Primary datastore
+  # Exposed on 127.0.0.1:5432 so host tooling (psql, Drizzle Studio) can
+  # connect. The init-extensions.sql script enables pg_trgm (trigram search
+  # for autocomplete) on first boot.
+  # ==========================================================================
+  postgres:
+    image: postgres:17-alpine
+    container_name: onestopnews-postgres-sample
+    environment:
+      POSTGRES_DB: onestopnews_dev
+      POSTGRES_USER: onestopnews
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-onestopnews_dev_password}
+      POSTGRES_HOST_AUTH_METHOD: trust # dev convenience — DO NOT use in prod
+      TZ: UTC
+      PGDATA: /var/lib/postgresql/data/pgdata
+    command: >
+      postgres
+      -c timezone=UTC
+      -c log_destination=stderr
+      -c logging_collector=off
+      -c log_min_messages=warning
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-extensions.sql:/docker-entrypoint-initdb.d/01-init-extensions.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U onestopnews -d onestopnews_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - onestopnews-network
+    restart: unless-stopped
+
+  # ==========================================================================
+  # Redis 7 — Cache, BullMQ queues, sessions, rate limiting
+  #
+  # CRITICAL: --maxmemory-policy must be "noeviction" (NOT allkeys-lru).
+  # BullMQ jobs are stored as Redis keys; under memory pressure, an LRU
+  # policy would evict job metadata and silently lose jobs. The default
+  # Redis policy is noeviction, but we set it explicitly to document
+  # intent and protect against future Redis defaults changes.
+  #
+  # --appendonly yes enables AOF persistence so jobs survive Redis restarts.
+  # Without AOF, jobs in memory are lost on restart (RDB snapshots only
+  # run periodically and can lose up to 60s of data).
+  # ==========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: onestopnews-redis-sample
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy noeviction
+      --appendonly yes
+      --save 60 1000
+      --loglevel warning
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - onestopnews-network
+    restart: unless-stopped
+
+  # ==========================================================================
+  # Next.js 16 Web Application (development with hot reload)
+  # Built from the repo-root Dockerfile.dev. The web service runs `pnpm dev`
+  # (defined as the Dockerfile.dev CMD) and exposes port 3000 on the host.
+  #
+  # Bind-mounts the repo at /app so Turbopack Fast Refresh works against
+  # live source changes. The anonymous /app/node_modules volume prevents
+  # the host's node_modules from clobbering the container's pnpm-installed
+  # dependencies. The .next cache is preserved across restarts.
+  #
+  # Env vars are sourced from .env.docker (env_file) plus inline overrides
+  # for DATABASE_URL and REDIS_URL so the web app can find the postgres
+  # and redis services on the compose network.
+  # ==========================================================================
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      target: development
+    container_name: onestopnews-web-sample
+    env_file:
+      - .env.docker
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://onestopnews:${DB_PASSWORD:-onestopnews_dev_password}@postgres:5432/onestopnews_dev
+      REDIS_URL: redis://redis:6379
+      AUTH_URL: http://localhost:3000
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - .next:/app/.next
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - onestopnews-network
+    restart: unless-stopped
+
+  # ==========================================================================
+  # BullMQ Worker (development with watch mode)
+  # Built from the repo-root Dockerfile.worker.dev. Runs `tsx watch
+  # src/workers/index.ts` (defined as the Dockerfile.worker.dev CMD) for
+  # hot-reload during worker development. Shares the same bind-mount and
+  # env wiring as the web service so code changes are picked up by both.
+  #
+  # The worker needs DATABASE_URL, REDIS_URL, ANTHROPIC_API_KEY,
+  # OPENAI_API_KEY, and PUSH_KEY_ENCRYPTION_KEY at minimum. All other
+  # env vars come from .env.docker.
+  # ==========================================================================
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker.dev
+    container_name: onestopnews-worker-sample
+    env_file:
+      - .env.docker
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://onestopnews:${DB_PASSWORD:-onestopnews_dev_password}@postgres:5432/onestopnews_dev
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - onestopnews-network
+    restart: unless-stopped
+
+# =============================================================================
+# Named Volumes
+# Persist data across container restarts. The Docker daemon manages these
+# on the host filesystem; remove with `docker compose down -v` to reset.
+# =============================================================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local

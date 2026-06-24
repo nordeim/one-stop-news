@@ -1,0 +1,73 @@
+$ git status
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+        modified:   app_start_log.txt
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+        modified:   src/app/(admin)/layout.test.tsx
+        modified:   src/app/(admin)/layout.tsx
+        modified:   src/app/auth-error/page.tsx
+        modified:   src/app/sign-in/SignInClient.test.tsx
+        modified:   src/app/sign-in/SignInClient.tsx
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        src/app/auth-error/page.test.tsx
+
+---
+
+$ git diff src/app/sign-in/SignInClient.tsx
+diff --git a/src/app/sign-in/SignInClient.tsx b/src/app/sign-in/SignInClient.tsx
+index ac9d5f6..b1f328b 100644
+--- a/src/app/sign-in/SignInClient.tsx
++++ b/src/app/sign-in/SignInClient.tsx
+@@ -25,7 +25,7 @@ interface SignInClientProps {
+ 
+ export function SignInClient({ showGoogle, showGithub }: SignInClientProps) {
+   return (
+-    <main className="min-h-[calc(100vh-200px)] flex items-center justify-center px-4 py-16">
++    <main id="main-content" className="min-h-[calc(100vh-200px)] flex items-center justify-center px-4 py-16">
+       <div className="w-full max-w-md">
+         {/* Heading */}
+         <header className="text-center mb-10">
+(venv) pete@pop-os:/home/project/onestopnews
+$ git diff src/app/sign-in/SignInClient.test.tsx
+diff --git a/src/app/sign-in/SignInClient.test.tsx b/src/app/sign-in/SignInClient.test.tsx
+index 377e8a7..dfe03ed 100644
+--- a/src/app/sign-in/SignInClient.test.tsx
++++ b/src/app/sign-in/SignInClient.test.tsx
+@@ -69,4 +69,13 @@ describe("SignInClient", () => {
+     expect(homeLink).toBeDefined();
+     expect(homeLink.getAttribute("href")).toBe("/");
+   });
++
++  it("renders a <main> element with id='main-content' as the skip-link target", () => {
++    // The skip-to-content link in layout.tsx targets #main-content.
++    // Every page template must render <main id="main-content"> for the
++    // skip link to have a valid target on that page.
++    const { container } = render(<SignInClient showGoogle={false} showGithub={false} />);
++    const main = container.querySelector("main#main-content");
++    expect(main).not.toBeNull();
++  });
+ });
+(venv) pete@pop-os:/home/project/onestopnews
+$ git diff src/app/auth-error/page.tsx
+diff --git a/src/app/auth-error/page.tsx b/src/app/auth-error/page.tsx
+index 30f077e..fc1688a 100644
+--- a/src/app/auth-error/page.tsx
++++ b/src/app/auth-error/page.tsx
+@@ -24,7 +24,7 @@ export default function AuthErrorPage() {
+       <Suspense fallback={null}>
+         <Header />
+       </Suspense>
+-      <main className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-12">
++      <main id="main-content" className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-12">
+         <div className="max-w-3xl mx-auto py-24 text-center">
+           <span
+             className="block w-1.5 h-1.5 rounded-full bg-dispatch-ember mx-auto mb-4"
+

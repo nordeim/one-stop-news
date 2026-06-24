@@ -1,0 +1,1332 @@
+$ git status
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+        modified:   .env.example
+        modified:   .github/workflows/ci.yml
+        modified:   AGENTS.md
+        modified:   CLAUDE.md
+        modified:   Dockerfile.dev
+        modified:   Dockerfile.web
+        modified:   Dockerfile.worker
+        modified:   Dockerfile.worker.dev
+        modified:   README.md
+        modified:   docker-compose.prod.yml
+        modified:   drizzle/meta/_journal.json
+        modified:   next.config.ts
+        modified:   src/app/(public)/page.tsx
+        modified:   src/app/api/push/subscribe/route.test.ts
+        modified:   src/features/feed/components/FeedData.tsx
+        modified:   src/lib/auth/index.ts
+        modified:   src/lib/db/schema.ts
+        modified:   src/lib/env/index.ts
+        modified:   src/test/setup.ts
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        drizzle/0005_neat_wolverine.sql
+        drizzle/meta/0005_snapshot.json
+        recent_code_changes_to_review_and_validate_2.txt
+        src/app/auth-error/
+        src/app/sign-in/
+        src/features/feed/components/FeedContainer.test.tsx
+        src/features/feed/components/FeedContainer.tsx
+        src/features/feed/components/LoadMoreButton.test.tsx
+        src/features/feed/components/LoadMoreButton.tsx
+        src/lib/auth/providers.test.ts
+        src/lib/auth/providers.ts
+
+---
+
+diff --git a/.env.example b/.env.example
+index 4d74b13..af29836 100644
+--- a/.env.example
++++ b/.env.example
+@@ -17,6 +17,19 @@ REDIS_URL=redis://localhost:6379
+ AUTH_SECRET=dev-secret-do-not-use-in-production
+ AUTH_URL=http://localhost:3000
+ 
++# ----------------------------------------------------------------------
++# OAuth Providers (optional — leave blank to use Credentials-only auth)
++# ----------------------------------------------------------------------
++# Google OAuth: https://console.cloud.google.com/apis/credentials
++# Set the authorized redirect URI to: ${AUTH_URL}/api/auth/callback/google
++# GOOGLE_CLIENT_ID=
++# GOOGLE_CLIENT_SECRET=
++
++# GitHub OAuth: https://github.com/settings/developers
++# Set the authorization callback URL to: ${AUTH_URL}/api/auth/callback/github
++# GITHUB_CLIENT_ID=
++# GITHUB_CLIENT_SECRET=
++
+ # ----------------------------------------------------------------------
+ # AI Providers (dummy keys for development – replace when testing real APIs)
+ # ----------------------------------------------------------------------
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 4743174..536466d 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -66,4 +66,11 @@ jobs:
+       VAPID_PRIVATE_KEY: "ci-dummy-vapid-private-key-not-real"
+       VAPID_SUBJECT: "mailto:ci@onestopnews.com"
+       PUSH_KEY_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
++      # OAuth env vars are optional in env/index.ts. CI sets dummy values so
++      # any test that imports @/lib/auth doesn't trip env validation if the
++      # schema ever changes to require them.
++      GOOGLE_CLIENT_ID: "ci-dummy-google-client-id"
++      GOOGLE_CLIENT_SECRET: "ci-dummy-google-client-secret"
++      GITHUB_CLIENT_ID: "ci-dummy-github-client-id"
++      GITHUB_CLIENT_SECRET: "ci-dummy-github-client-secret"
+       NODE_ENV: "test"
+diff --git a/AGENTS.md b/AGENTS.md
+index a7b5150..78016d0 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -436,6 +436,19 @@ Must pass before any PR is merged. No exceptions.
+ | `summaryStatus: "none"` after all BullMQ retries exhausted (Phase 14) | No observability — failed summaries invisible, appear as "no summary" | Use `getSummaryFailureState()` → sets `needs_review` when `attemptsMade >= maxAttempts` |
+ | Hardcoded SHA-256 vector in test (Phase 14) | Brittle — fails if delimiter or date format changes | Property-based test: compute expected via `node:crypto` inline |
+ | E2E tests scanned by vitest (Phase 14) | `@playwright/test` not installed in vitest env → import errors | Exclude `e2e/` + `playwright.config.ts` from `vitest.config.ts`, `eslint.config.mjs`, `tsconfig.json` |
++| `node:22-alpine` in Dockerfile (Phase 15) | Violates `package.json` `engines.node: ">=24.0.0"` — runtime crashes on Node 22-only APIs | Pin to `node:24-alpine` in all Dockerfiles (`Dockerfile.web`, `Dockerfile.worker`, `Dockerfile.dev`, `Dockerfile.worker.dev`) |
++| Missing `output: "standalone"` in `next.config.ts` (Phase 15) | `Dockerfile.web` copies `.next/standalone/` which doesn't exist → build fails | Add `output: "standalone"` top-level in `next.config.ts` (alongside `cacheComponents: true`) |
++| `Dockerfile.worker` referencing `worker:build` script (Phase 15) | Script doesn't exist in `package.json` — `pnpm run worker:build` fails | Run `tsx src/workers/index.ts` directly; copy `node_modules` + `src` to runner stage |
++| `Dockerfile.worker` copying non-existent `dist/` (Phase 15) | No build step produces `dist/` — `COPY --from=builder /app/dist` fails | Don't compile the worker; run from `src/` via `tsx` (worker imports use `@/` path alias) |
++| Malformed Dockerfile lines like `COPY . .RUN` (Phase 15) | Missing newline between commands — Docker parses as single instruction, fails | Each `RUN`/`COPY`/`WORKDIR` instruction must be on its own line |
++| `Dockerfile.dev` / `Dockerfile.worker.dev` copying `packages/` (Phase 15) | Directory doesn't exist (not a monorepo) — `COPY packages/ ./packages/` fails | Remove the `COPY packages/` line |
++| Always-on OAuth providers without env vars (Phase 15) | Auth.js throws at boot if `CLIENT_ID`/`CLIENT_SECRET` env vars are missing | Make providers conditional via `buildProviders()` — only include when both env vars present |
++| Missing `/sign-in` page referenced in `pages.signIn` (Phase 15) | Auth.js silently accepts non-existent path; user redirected to 404 at runtime | Create `src/app/sign-in/page.tsx` (Server) + `SignInClient.tsx` (Client) |
++| Missing `/auth-error` page referenced in `pages.error` (Phase 15) | Auth errors redirect to non-existent page → 404 instead of graceful error | Create `src/app/auth-error/page.tsx` (Server Component) |
++| `vi.fn()` for `global.fetch` without `vi.stubGlobal` (Phase 15) | Real `fetch` is called instead of mock — tests fail with network errors | Use `vi.stubGlobal("fetch", mockFetch)` in `beforeEach()`; reset with `mockFetch.mockReset()` |
++| Accessing `provider.id` without type narrowing (Phase 15) | Auth.js v5 `Provider` type is a union (object form + function form) — `TS2339: Property 'id' does not exist` | Use `'id' in p ? p.id : "unknown"` narrowing in test helpers |
++| Direct `<FeedGrid>` rendering in `FeedData` (Phase 15) | No "Load More" pagination — users see only the initial 6 articles, no way to fetch more | Render `<FeedContainer>` which manages article list + load more state; pass `initialNextCursor` + `initialHasMore` |
++| Stale file paths in docs (Phase 15) | `Masthead.tsx`/`NewsTicker.tsx` listed under `src/features/feed/components/` but actually in `src/shared/components/layout/`; `Stats.tsx`/`FAQ.tsx`/`Newsletter.tsx` listed under non-existent `src/features/feed/{stats,faq,newsletter}/` | Verify file paths against actual filesystem before documenting; use `find src -name "*.tsx"` to audit |
+ 
+ ---
+ 
+@@ -931,13 +944,14 @@ const resultRows = rows.slice(0, limit); // Remove the extra row
+ | `src/features/feed/components/FeedData.tsx` | 9 | Server Component for Suspense-bound data fetching (blocking-route fix) |
+ | `src/features/feed/components/FeedSkeleton.tsx` | 9 | Loading fallback for feed grid during data fetch |
+ | `src/app/(public)/page.tsx` | 10 | Landing page with 10 integrated sections (root) |
+-| `src/features/feed/components/NewsTicker.tsx` | 10 | Animated marquee for breaking headlines |
+-| `src/features/feed/components/Masthead.tsx` | 10 | Edition bar, wordmark, live badge (Client Component for date) |
++| `src/shared/components/layout/NewsTicker.tsx` | 10 | Animated marquee for breaking headlines |
++| `src/shared/components/layout/Masthead.tsx` | 10 | Edition bar, wordmark, live badge (Client Component for date) |
+ | `src/features/feed/components/LeadStory.tsx` | 10 | 7:5 grid hero with breaking badge |
+-| `src/features/feed/ai/NutritionLabel.tsx` | 10 | AI provenance transparency panel |
+-| `src/features/feed/stats/Stats.tsx` | 10 | Trust indicators grid (247, 1.2M, 450K) |
+-| `src/features/feed/faq/FAQ.tsx` | 10 | Accordion with 6 Q&A items |
+-| `src/features/feed/newsletter/Newsletter.tsx` | 10 | Email signup CTA with trust badges |
++| `src/features/summaries/components/NutritionLabel.tsx` | 10 | AI provenance transparency panel |
++| `src/features/summaries/components/NutritionLabelDemo.tsx` | 10 | Demo wrapper for landing page |
++| `src/shared/components/ui/StatsSection.tsx` | 10 | Trust indicators grid (247, 1.2M, 450K) |
++| `src/shared/components/ui/Accordion.tsx` | 10 | Accordion with 6 Q&A items (FAQ) |
++| `src/shared/components/ui/NewsletterCTA.tsx` | 10 | Email signup CTA with trust badges |
+ | `src/lib/db/seed.ts` | 10 | Database seed script with sample articles, categories, sources |
+ | `src/app/globals.css` | 10 | Custom design system classes (cat-label, btn-ember, animations) |
+ | `next.config.ts` | 10 | Updated with `remotePatterns` for external images (picsum.photos) |
+@@ -997,6 +1011,32 @@ const resultRows = rows.slice(0, limit); // Remove the extra row
+ | `vitest.config.ts` (modified) | 14 | Exclude `e2e/` + `playwright.config.ts` from vitest |
+ | `eslint.config.mjs` (modified) | 14 | Exclude `e2e/` + `playwright.config.ts` from ESLint |
+ | `tsconfig.json` (modified) | 14 | Exclude `e2e/` + `playwright.config.ts` from tsc |
++| `next.config.ts` (modified) | 15 | Added `output: "standalone"` for production Docker builds |
++| `Dockerfile.web` (rewritten) | 15 | Pinned to `node:24-alpine`; copies `.next/standalone` (requires `output: "standalone"`) |
++| `Dockerfile.worker` (rewritten) | 15 | Pinned to `node:24-alpine`; runs `tsx src/workers/index.ts` directly (no `dist/`); fixed malformed lines |
++| `Dockerfile.dev` (modified) | 15 | Removed non-existent `packages/` copy |
++| `Dockerfile.worker.dev` (modified) | 15 | Removed `packages/` copy; fixed `worker:dev` → `pnpm exec tsx watch src/workers/index.ts` |
++| `docker-compose.prod.yml` (modified) | 15 | Pass through all env vars (incl. OAuth + TRUSTED_PROXY) from host |
++| `src/features/feed/components/FeedContainer.tsx` | 15 | Client component managing article list + cursor-based "Load More" state |
++| `src/features/feed/components/FeedContainer.test.tsx` | 15 | 8 TDD tests (initial render, fetch on click, append, loading, error+retry, last page) |
++| `src/features/feed/components/LoadMoreButton.tsx` | 15 | Cursor pagination button using existing `Button` primitive |
++| `src/features/feed/components/LoadMoreButton.test.tsx` | 15 | 5 TDD tests (render, hidden when !hasMore, onClick, loading, disabled) |
++| `src/features/feed/components/FeedData.tsx` (modified) | 15 | Renders `<FeedContainer>` instead of `<FeedGrid>` directly; passes nextCursor + hasMore |
++| `src/app/(public)/page.tsx` (modified) | 15 | Removed `TODO: Restore Load More` comment |
++| `src/lib/auth/providers.ts` | 15 | `buildProviders()` — conditional Credentials + Google + GitHub based on env vars |
++| `src/lib/auth/providers.test.ts` | 15 | 6 TDD tests (Credentials-only, Google conditional, GitHub conditional, all three, partial config) |
++| `src/lib/auth/index.ts` (modified) | 15 | Use `buildProviders()` instead of inline Credentials config |
++| `src/lib/env/index.ts` (modified) | 15 | Added 4 optional OAuth env vars (GOOGLE/GITHUB_CLIENT_ID/SECRET) |
++| `src/app/sign-in/page.tsx` | 15 | Server Component; inspects env vars, passes showGoogle/showGithub to client |
++| `src/app/sign-in/SignInClient.tsx` | 15 | Client Component with OAuth buttons + Credentials form (progressive enhancement) |
++| `src/app/sign-in/SignInClient.test.tsx` | 15 | 9 TDD tests (heading, form, OAuth buttons conditional, all combos, back link) |
++| `src/app/auth-error/page.tsx` | 15 | Auth error landing page (referenced in `pages.error`) |
++| `src/lib/db/schema.ts` (modified) | 15 | Dropped deprecated `keys` column from `pushSubscriptions` |
++| `src/app/api/push/subscribe/route.test.ts` (modified) | 15 | Removed `keys` field from mock (column dropped) |
++| `drizzle/0005_neat_wolverine.sql` | 15 | Migration: `ALTER TABLE push_subscriptions DROP COLUMN keys` |
++| `.env.example` (modified) | 15 | Added optional OAuth env vars with setup instructions |
++| `src/test/setup.ts` (modified) | 15 | Added dummy OAuth env vars for test isolation |
++| `.github/workflows/ci.yml` (modified) | 15 | Added dummy OAuth env vars to CI env block |
+ 
+ ---
+ 
+@@ -1105,20 +1145,34 @@ export default function HomePage() {
+ 
+ **Issue**: The order of components in `page.tsx` affects the visual hierarchy and the DOM structure. The correct order for the landing page is critical for CSS cascade and accessibility.
+ 
+-**Fix**: Follow this exact order in the page component:
++**Fix**: Follow this exact order in the page component (matches `src/app/(public)/page.tsx`):
+ ```tsx
+-<main>
+-  <NewsTicker />      {/* Top-level announcement */}
+-  <Masthead />        {/* Brand identity */}
+-  <Header />          {/* Navigation */}
+-  <LeadStory />       {/* Hero content */}
+-  <Feed />            {/* Main content */}
+-  <AI_NutritionLabel />{/* Transparency panel */}
+-  <Stats />           {/* Trust indicators */}
+-  <FAQ />             {/* Questions */}
+-  <Newsletter />      {/* CTA */}
+-  <Footer />          {/* Bottom */}
+-</main>
++<div className="min-h-screen bg-paper-50">
++  <div className="scroll-progress" aria-hidden="true" />
++  <NewsTicker />              {/* 1. Breaking news ticker */}
++  <Masthead />                {/* 2. Edition bar, wordmark, live badge */}
++  <Suspense fallback={null}>
++    <Header activeCategory="top-stories" /> {/* 3. Header + category nav */}
++  </Suspense>
++  <section>
++    <LeadStory />             {/* 4. Hero / 7:5 grid */}
++  </section>
++  <main>
++    <section>
++      <h2>Top Stories</h2>
++    </section>
++    <Suspense fallback={<FeedSkeleton />}>
++      <FeedData limit={6} />  {/* 5. Feed (Suspense + Server Component) */}
++    </Suspense>
++  </main>
++  <NutritionLabelDemo />      {/* 6. AI Nutrition Label demo */}
++  <StatsSection />            {/* 7. Trust indicators */}
++  <FaqAccordion />            {/* 8. FAQ accordion */}
++  <NewsletterCTA />           {/* 9. Newsletter signup */}
++  <Suspense fallback={null}>
++    <Footer />                {/* 10. Footer */}
++  </Suspense>
++</div>
+ ```
+ 
+ **Prevention**: Maintain a clear separation between layout and content. Ensure component order matches the visual hierarchy.
+@@ -1313,6 +1367,7 @@ pnpm dev
+ | **Phase 12** — Tailwind v4 PostCSS & Commit Mono Font Fix | **COMPLETE** | Installed `@tailwindcss/postcss@4.3.1`, created `postcss.config.mjs`, added Commit Mono woff2 via `next/font/local`, enhanced `.font-editorial` block, cleared `.next` cache |
+ | **Phase 13** — Critical Gaps Remediation (RSS + AI + FlowProducer + Rate Limiting) | **COMPLETE** | Real RSS/Atom/JSON parser via `rss-parser`, real AI summarization via Vercel AI SDK (Anthropic primary + OpenAI fallback), `FlowProducer` atomic DAG (ingest → score → refresh-feed-slice), `/api/articles` cursor validation + Redis rate limiting (20 req/s per IP), `hashContent` upgraded to SHA-256, `/api/categories` endpoint, `cacheInvalidation` singleton publisher, CI workflow fixed (Node 24 + all env vars), UI CSS class corruption fixes (`font浃着`→`font-mono`, `Monad`→`font-mono`), `accountablePerson.name` provenance fidelity, `body` column added to articles schema, content-change-detection upserts via `(xmax = 0)` trick |
+ | **Phase 14** — Validated Gaps Closure | **COMPLETE** | `hashContent` includes body (content-only updates detected), rate limiter `TRUSTED_PROXY` env var (rightmost IP for CDN), property-based `node:crypto` SHA-256 test, `pushSubscriptions.encryptedKeys` column (replaced misleading `keys.p256dh`), article detail page with real data + `SummaryPanel` + 3-layer provenance via `generateMetadata()`, Playwright config + 10 E2E tests, 8 pipeline integration tests, `getSummaryFailureState` (permanent failure → `needs_review`), `e2e/` excluded from vitest/ESLint/tsc (**251 tests across 45 suites** + 10 E2E) |
++| **Phase 15** — Production Readiness (Dockerfiles, Load More, Drop keys, OAuth) | **COMPLETE** | Pinned Dockerfiles to `node:24-alpine` + `output: "standalone"` in `next.config.ts`; rewrote `Dockerfile.worker` to run `tsx src/workers/index.ts` directly (fixing malformed lines + non-existent scripts/paths); cursor-based "Load More" pagination (`FeedContainer` + `LoadMoreButton` client components); dropped deprecated `push_subscriptions.keys` column (migration `0005_neat_wolverine.sql`); added Google + GitHub OAuth providers (conditional on env vars, backward-compatible); created `/sign-in` + `/auth-error` pages (previously missing); added OAuth env vars to `env/index.ts` + `.env.example` + `src/test/setup.ts` + CI + `docker-compose.prod.yml` (**279 tests across 49 suites** + 10 E2E) |
+ 
+ ---
+ 
+@@ -1477,11 +1532,109 @@ vi.mock("ioredis", () => ({
+ 1. **Install Playwright Browsers:** Run `npx playwright install --with-deps` before executing E2E tests. The `playwright.config.ts` auto-starts the dev server via `webServer` config.
+ 2. **Apply Phase 14 Migration:** Run `pnpm drizzle-kit migrate` to apply `0004_smiling_newton_destine.sql` (adds `encrypted_keys` column, drops NOT NULL on `keys`).
+ 3. **Set `TRUSTED_PROXY=true`** in `.env.local` when behind a CDN/reverse proxy (Cloudflare, Nginx). This switches the rate limiter to use the rightmost IP from `x-forwarded-for`.
+-4. **Drop Old `keys` Column:** After confirming all push subscriptions use the new `encryptedKeys` column, drop the deprecated `keys` column in a future migration.
+-5. **Expand E2E Coverage:** The 10 smoke tests cover basic journeys. Add tests for: admin login → source management, article detail → request AI summary, search with filters, push subscription flow.
++4. **~~Drop Old `keys` Column~~** (RESOLVED — Phase 15): The deprecated `keys` column was dropped in migration `0005_neat_wolverine.sql`. Run `pnpm drizzle-kit migrate` to apply.
++5. **Expand E2E Coverage:** The 10 smoke tests cover basic journeys. Add tests for: admin login → source management, article detail → request AI summary, search with filters, push subscription flow, OAuth sign-in.
+ 6. **Integration Test with Real DB:** The current pipeline integration test mocks the DB. Consider adding a test that uses a real PostgreSQL instance (via Docker) for true end-to-end verification.
+ 7. **Monitor `needs_review` Queue:** Phase 14 sets `summaryStatus: "needs_review"` after 3 AI failures. Monitor the admin review queue (`/admin/summaries`) for failed summaries and investigate root causes.
+ 
+ ---
+ 
++## Phase 15: Production Readiness — Lessons Learned
++
++### Phase 15 Gotchas Discovered
++
++#### 1. Dockerfile Drift — Node Version Mismatch + Malformed Lines
++
++**Issue**: Production Dockerfiles pinned `node:22-alpine` while `package.json` requires Node 24. Additionally, `Dockerfile.worker` had malformed lines (missing newlines: `COPY . .RUN`, `WORKDIR /appENV`), referenced a non-existent `worker:build` script, and copied a non-existent `dist/` directory. `Dockerfile.dev`/`Dockerfile.worker.dev` copied a non-existent `packages/` directory (not a monorepo).
++
++**Fix**: Pinned all 4 Dockerfiles to `node:24-alpine`. Rewrote `Dockerfile.worker` to run `tsx src/workers/index.ts` directly (copying `node_modules` + `src` to the runner stage). Fixed `Dockerfile.dev`/`Dockerfile.worker.dev` (removed `packages/` copy + corrected script names).
++
++**Lesson**: Dockerfiles must be validated as part of CI — not just visually reviewed. Always pin to the exact Node version specified in `engines.node`. Each Dockerfile instruction (`RUN`, `COPY`, `WORKDIR`) must be on its own line. Never reference directories or scripts that don't exist — verify with `ls` and `cat package.json` before writing Dockerfile instructions.
++
++#### 2. `output: "standalone"` Required for Production Docker
++
++**Issue**: `Dockerfile.web` copied `.next/standalone/server.js` but `next.config.ts` didn't set `output: "standalone"` — the build would fail because the standalone directory wasn't generated.
++
++**Fix**: Added `output: "standalone"` to `next.config.ts` (top-level, alongside `cacheComponents: true`). This bundles only production deps into a self-contained server.
++
++**Lesson**: `output: "standalone"` is mandatory when using the standalone Docker pattern. Without it, the Dockerfile references a directory that doesn't exist. Always pair the config flag with the Dockerfile copy step — they're a coupled pair.
++
++#### 3. Cursor-Based "Load More" — Server Fetch Initial, Client Fetches Subsequent
++
++**Issue**: `getFeedArticles()` already returned `{ articles, nextCursor, hasMore }` but the UI never surfaced this. The home page had a `TODO: Restore Load More with cursor pagination` comment. `/api/articles` already supported the `cursor` query param.
++
++**Fix**: Created `FeedContainer` (client component) that receives `initialArticles` + `initialNextCursor` + `initialHasMore` from the Server Component (`FeedData`). On "Load More" click, it fetches `/api/articles?cursor=...` and appends results. Handles loading, error+retry, and "no more articles" states. Used the existing `Button` primitive (library discipline).
++
++**Lesson**: The Next.js 16 App Router pattern for paginated feeds is: Server Component fetches page 1 (for fast initial render + SEO), Client Component fetches subsequent pages (for interactivity). The `<Suspense>` boundary wraps the Server Component so the page shell renders immediately. The `LoadMoreButton` is hidden entirely when `hasMore` is false — the absence of the button IS the empty state.
++
++#### 4. Dropping a Deprecated Column — Additive Migration Verification via TDD
++
++**Issue**: The `keys` column on `push_subscriptions` was marked `@deprecated` in Phase 14 but retained for "backward compat". Phase 15 needed to drop it safely.
++
++**Fix**: Used a TDD-style verification: first removed `keys` from the test mock (`route.test.ts`) and confirmed tests still passed (proving no code reads the column). THEN removed the column from `schema.ts`. Generated migration `0005_neat_wolverine.sql` via `drizzle-kit generate` (`ALTER TABLE push_subscriptions DROP COLUMN keys;`).
++
++**Lesson**: Before dropping a column, grep the entire `src/` for references. Use the test mock as a canary — if removing the column from the mock doesn't break tests, no code reads it. Always generate a Drizzle migration (`drizzle-kit generate`) rather than writing SQL by hand. The Drizzle journal (`drizzle/meta/_journal.json`) must be committed alongside the migration SQL.
++
++#### 5. OAuth Providers — Conditional Configuration for Backward Compat
++
++**Issue**: Adding Google + GitHub OAuth providers naively (always-on) would break existing deployments that don't have OAuth env vars configured — Auth.js would throw at boot because the providers would try to initialize without credentials.
++
++**Fix**: Extracted `buildProviders()` into a separate module (`src/lib/auth/providers.ts`) that conditionally includes Google/GitHub only when both `CLIENT_ID` and `CLIENT_SECRET` are present. The env vars are `.optional()` in the Zod schema. This preserves backward compat: deployments without OAuth continue to work with Credentials-only auth.
++
++**Lesson**: When adding new auth providers, make them conditional on env vars. Never assume all deployments will have the same provider configuration. The `Provider` type from Auth.js v5 is a union (object form + function form) — use `'id' in p` narrowing to access the `id` property safely in tests.
++
++#### 6. Missing `/sign-in` and `/auth-error` Pages — Referenced but Non-Existent
++
++**Issue**: `src/lib/auth/index.ts` had `pages.signIn: "/sign-in"` and `pages.error: "/auth-error"`, but neither page existed. The Credentials flow was broken (no UI to trigger it). Auth.js silently accepts non-existent paths in the config.
++
++**Fix**: Created `src/app/sign-in/page.tsx` (Server Component that inspects env vars and passes `showGoogle`/`showGithub` to `SignInClient`) + `src/app/sign-in/SignInClient.tsx` (Client Component with OAuth buttons + Credentials form). Created `src/app/auth-error/page.tsx` (simple error landing). Used `<form action="/api/auth/signin/google" method="post">` for OAuth (progressive enhancement — works without client JS, no `SessionProvider` needed).
++
++**Lesson**: Always verify that routes referenced in `pages.signIn`/`pages.error` actually exist. The Auth.js config silently accepts non-existent paths — the failure only appears at runtime when a user is redirected to a 404. Server-action forms (`<form action="..." method="post">`) are the simplest OAuth trigger pattern — no `SessionProvider` or client-side `signIn()` needed. This is the progressive-enhancement pattern: works without client JS.
++
++#### 7. Mocking `global.fetch` in Vitest — `vi.stubGlobal` Pattern
++
++**Issue**: Tests for `FeedContainer` (which calls `fetch("/api/articles?cursor=...")`) created a `vi.fn()` mock but never assigned it to `global.fetch`, so the real `fetch` was called (which failed since no server was running). Tests appeared to time out or fail with network errors.
++
++**Fix**: Used `vi.stubGlobal("fetch", mockFetch)` in `beforeEach()` to replace the global `fetch` with the mock. Reset in `beforeEach` via `mockFetch.mockReset()`.
++
++**Lesson**: `vi.fn()` creates a mock function but doesn't replace anything by itself. For global APIs like `fetch`, use `vi.stubGlobal("fetch", mockFn)` (or assign `global.fetch = mockFn as unknown as typeof fetch`). Always reset between tests to avoid cross-test contamination. The `vi.stubGlobal` approach is preferred because Vitest automatically restores it after the test suite if `unstubGlobals: true` is set in config.
++
++#### 8. Stale File Paths in Documentation
++
++**Issue**: README.md and AGENTS.md file inventories listed `Masthead.tsx`/`NewsTicker.tsx` under `src/features/feed/components/` but they actually live in `src/shared/components/layout/`. Similarly, `Stats.tsx`/`FAQ.tsx`/`Newsletter.tsx` were listed under non-existent `src/features/feed/{stats,faq,newsletter}/` directories — the actual files are `StatsSection.tsx`/`Accordion.tsx`/`NewsletterCTA.tsx` in `src/shared/components/ui/`.
++
++**Fix**: Updated all file path references in README.md file hierarchy, CLAUDE.md Quick Reference, and AGENTS.md file inventory to match the actual filesystem locations.
++
++**Lesson**: Documentation file paths drift over time as components are moved during refactors. Audit docs against the actual filesystem periodically using `find src -name "*.tsx" | sort`. Consider a CI check that greps doc-cited paths and verifies they exist.
++
++### Phase 15 Recommendations
++
++1. **Apply Phase 15 Migration:** Run `pnpm drizzle-kit migrate` to apply `0005_neat_wolverine.sql` (drops the deprecated `keys` column on `push_subscriptions`). Verify with `\d push_subscriptions` in psql.
++
++2. **Build and Test Docker Images:** Run `docker build -f Dockerfile.web -t onestopnews-web .` and `docker build -f Dockerfile.worker -t onestopnews-worker .` to verify both production images build successfully. The web image requires `output: "standalone"` in `next.config.ts` (added in Phase 15).
++
++3. **Configure OAuth Providers (Optional):** To enable Google + GitHub sign-in, set the env vars in `.env.local`:
++   ```bash
++   GOOGLE_CLIENT_ID=your-google-client-id
++   GOOGLE_CLIENT_SECRET=your-google-client-secret
++   GITHUB_CLIENT_ID=your-github-client-id
++   GITHUB_CLIENT_SECRET=your-github-client-secret
++   ```
++   Set the authorized redirect URIs in the OAuth provider consoles:
++   - Google: `${AUTH_URL}/api/auth/callback/google`
++   - GitHub: `${AUTH_URL}/api/auth/callback/github`
++   The `/sign-in` page will automatically show the OAuth buttons when env vars are present.
++
++4. **Add Sign-In / Sign-Out Button to Header:** The `/sign-in` page now exists (Phase 15) but there's no sign-in/sign-out button in the `Header` component. Users must navigate to `/sign-in` manually. Add a conditional button to `src/shared/components/layout/Header.tsx` that shows "Sign In" when unauthenticated (links to `/sign-in`) and "Sign Out" when authenticated (calls `signOut()` server action).
++
++5. **Extend Load More to Topic Pages:** Phase 15 added cursor-based "Load More" pagination to the home feed (`FeedContainer` + `LoadMoreButton`). The topic pages (`/topics/[category]`) still render only the initial page. Consider reusing `FeedContainer` on topic pages for consistency.
++
++6. **OAuth Account Linking:** Phase 15 added Google + GitHub OAuth providers, but there's no UI for linking an OAuth account to an existing Credentials account. If a user signs in with Credentials first and later tries OAuth with the same email, Auth.js will create a separate account. Consider adding an account-linking flow in a user settings page.
++
++7. **Run E2E Tests After Phase 15:** Run `pnpm test:e2e` (requires `pnpm dev` running or auto-start via `webServer` config) to verify the 10 Playwright E2E smoke tests still pass with the new sign-in page available. Consider adding E2E tests for the sign-in flow itself.
++
++8. **Audit Docs Against Filesystem:** Periodically run `find src -name "*.tsx" -o -name "*.ts" | sort` and compare against the file paths cited in README.md, CLAUDE.md, and AGENTS.md. Consider adding a CI check that verifies doc-cited paths exist.
++
++---
++
+ *This AGENTS.md mirrors the authoritative Project Architecture Document v4.5 and Project Requirements Document v4.3. When the instructions here and the PAD/PRD diverge, the PAD/PRD are the source of truth.*
+diff --git a/CLAUDE.md b/CLAUDE.md
+index c1394ea..27f82ce 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -248,6 +248,18 @@ pnpm test
+ | `summaryStatus: "none"` after all retries exhausted (Phase 14) | No observability — failed summaries invisible | Set `summaryStatus: "needs_review"` via `getSummaryFailureState()` |
+ | Hardcoded SHA-256 vector in test (Phase 14) | Brittle — fails if delimiter/date format changes | Property-based test: compute expected via `node:crypto` inline |
+ | E2E tests in vitest (Phase 14) | `@playwright/test` not installed in vitest env → import errors | Exclude `e2e/` from `vitest.config.ts`, `eslint.config.mjs`, `tsconfig.json` |
++| `node:22-alpine` in Dockerfile (Phase 15) | Violates `package.json` `engines.node: ">=24.0.0"` — runtime crashes on Node 22-only APIs | Pin to `node:24-alpine` in all Dockerfiles |
++| Missing `output: "standalone"` in `next.config.ts` (Phase 15) | `Dockerfile.web` copies `.next/standalone/` which doesn't exist → build fails | Add `output: "standalone"` top-level in `next.config.ts` |
++| `Dockerfile.worker` referencing `worker:build` script (Phase 15) | Script doesn't exist — `pnpm run worker:build` fails | Run `tsx src/workers/index.ts` directly; copy `node_modules` + `src` to runner |
++| `Dockerfile.worker` copying non-existent `dist/` (Phase 15) | No build step produces `dist/` — `COPY --from=builder /app/dist` fails | Don't compile the worker; run from `src/` via `tsx` |
++| Malformed Dockerfile lines (`COPY . .RUN`) (Phase 15) | Missing newline between commands — Docker parses as single command, fails | Each `RUN`/`COPY`/`WORKDIR` must be on its own line |
++| `Dockerfile.dev` copying `packages/` (Phase 15) | Directory doesn't exist (not a monorepo) — `COPY packages/ ./packages/` fails | Remove the `COPY packages/` line |
++| Always-on OAuth providers (Phase 15) | Auth.js throws at boot if `CLIENT_ID`/`CLIENT_SECRET` env vars are missing | Make providers conditional via `buildProviders()` — only include when env vars present |
++| Missing `/sign-in` page referenced in `pages.signIn` (Phase 15) | Auth.js silently accepts non-existent path; user redirected to 404 at runtime | Create `src/app/sign-in/page.tsx` + `SignInClient.tsx` |
++| Missing `/auth-error` page referenced in `pages.error` (Phase 15) | Auth errors redirect to non-existent page → 404 | Create `src/app/auth-error/page.tsx` |
++| `vi.fn()` for `global.fetch` without `vi.stubGlobal` (Phase 15) | Real `fetch` is called instead of mock — tests fail with network errors | Use `vi.stubGlobal("fetch", mockFetch)` in `beforeEach()` |
++| Accessing `provider.id` without type narrowing (Phase 15) | `Provider` type is a union (object form + function form) — `TS2339` | Use `'id' in p ? p.id : "unknown"` narrowing |
++| Direct `<FeedGrid>` rendering in `FeedData` (Phase 15) | No "Load More" pagination — users see only the initial 6 articles | Render `<FeedContainer>` which manages article list + load more state |
+ 
+ ---
+ 
+@@ -283,6 +295,7 @@ Layer 4: Infrastructure       — Drizzle, BullMQ, Auth.js. Side effects only.
+ | **Phase 12** — Tailwind v4 PostCSS & Commit Mono Font Fix | **COMPLETE** | Installed `@tailwindcss/postcss@4.3.1`, created `postcss.config.mjs`, added Commit Mono woff2 via `next/font/local`, enhanced `.font-editorial` block, cleared `.next` cache |
+ | **Phase 13** — Critical Gaps Remediation | **COMPLETE** | Real RSS/Atom/JSON parser (`rss-parser`), real AI summarization (Vercel AI SDK: Anthropic primary + OpenAI fallback), `FlowProducer` atomic DAG, `/api/articles` cursor validation + Redis rate limiting (20 req/s per IP), `hashContent` SHA-256, `/api/categories` endpoint, `cacheInvalidation` singleton publisher, CI workflow fixed (Node 24 + all env vars), UI CSS class corruption fixes (`font浃着`→`font-mono`, `Monad`→`font-mono`), `accountablePerson.name` provenance fidelity, `body` column added to articles schema, content-change-detection upserts via `(xmax = 0)` trick |
+ | **Phase 14** — Validated Gaps Closure | **COMPLETE** | `hashContent` includes body (content-only updates detected), rate limiter `TRUSTED_PROXY` env var (rightmost IP for CDN), property-based `node:crypto` SHA-256 test, `pushSubscriptions.encryptedKeys` column (replaced misleading `keys.p256dh`), article detail page with real data + `SummaryPanel` + 3-layer provenance via `generateMetadata()`, Playwright config + 10 E2E tests, 8 pipeline integration tests, `getSummaryFailureState` (permanent failure → `needs_review`), `e2e/` excluded from vitest/ESLint/tsc (**251 tests across 45 suites** + 10 E2E) |
++| **Phase 15** — Production Readiness (Dockerfiles, Load More, Drop keys, OAuth) | **COMPLETE** | Pinned Dockerfiles to `node:24-alpine` + `output: "standalone"` in `next.config.ts`; rewrote `Dockerfile.worker` to run `tsx src/workers/index.ts` directly (fixing malformed lines + non-existent scripts/paths); cursor-based "Load More" pagination (`FeedContainer` + `LoadMoreButton` client components); dropped deprecated `push_subscriptions.keys` column (migration `0005_neat_wolverine.sql`); added Google + GitHub OAuth providers (conditional on env vars, backward-compatible); created `/sign-in` + `/auth-error` pages (previously missing); added OAuth env vars to `env/index.ts` + `.env.example` + `src/test/setup.ts` + CI + `docker-compose.prod.yml` (**279 tests across 49 suites** + 10 E2E) |
+ 
+ ---
+ 
+@@ -460,10 +473,12 @@ actionlint .github/workflows/ci.yml
+ | Lighthouse Config | `lighthouserc.js` |
+ | Deploy Script | `scripts/deploy.sh` |
+ | Feed Data (Suspense) | `src/features/feed/components/FeedData.tsx` |
++| Feed Container (Load More) | `src/features/feed/components/FeedContainer.tsx` (Phase 15) |
++| Load More Button | `src/features/feed/components/LoadMoreButton.tsx` (Phase 15) |
+ | Feed Skeleton | `src/features/feed/components/FeedSkeleton.tsx` |
+ | Landing Page | `src/app/(public)/page.tsx` |
+-| News Ticker | `src/features/feed/components/NewsTicker.tsx` |
+-| Masthead | `src/features/feed/components/Masthead.tsx` |
++| News Ticker | `src/shared/components/layout/NewsTicker.tsx` |
++| Masthead | `src/shared/components/layout/Masthead.tsx` |
+ | Lead Story | `src/features/feed/components/LeadStory.tsx` |
+ | AI Nutrition Label | `src/features/summaries/components/NutritionLabel.tsx` |
+ | Stats Section | `src/shared/components/ui/StatsSection.tsx` |
+@@ -483,6 +498,11 @@ actionlint .github/workflows/ci.yml
+ | Push Subscribe Route | `src/app/api/push/subscribe/route.ts` |
+ | Playwright Config | `playwright.config.ts` (Phase 14) |
+ | E2E Smoke Tests | `e2e/smoke.spec.ts` (Phase 14) |
++| Auth Providers Builder | `src/lib/auth/providers.ts` (Phase 15) |
++| Sign-In Page | `src/app/sign-in/page.tsx` (Phase 15) |
++| Sign-In Client Component | `src/app/sign-in/SignInClient.tsx` (Phase 15) |
++| Auth Error Page | `src/app/auth-error/page.tsx` (Phase 15) |
++| Migration 0005 (Drop keys) | `drizzle/0005_neat_wolverine.sql` (Phase 15) |
+ 
+ ---
+ 
+@@ -645,7 +665,7 @@ export default async function HomePage() {
+ - **Maintained by**: Senior Engineering, Tech Leads, DevOps
+ - **Authoritative Sources**: `Project_Architecture_Document_v4.5.md` | `Project_Requirements_Document_v4.3.md` | `README.md`
+ - **Last Updated**: June 18, 2026
+-- **Total Tests**: 251 across 45 suites + 10 Playwright E2E (Phase 14)
++- **Total Tests**: 279 across 49 suites + 10 Playwright E2E (Phase 15)
+ - **Quality Gate**: `pnpm check` (tsc --noEmit + ESLint --max-warnings 0) + `pnpm test` (vitest run) — all green
+ 
+ ---
+@@ -845,3 +865,63 @@ Combined with `WHERE content_hash != excluded.content_hash`, this detects conten
+ **Fix**: Self-referential mock: `leftJoinResult.leftJoin = leftJoin` so the second `leftJoin` returns the same object (which has `where`).
+ 
+ **Lesson**: Drizzle's query builder is deeply chainable. Self-referential mocks (`result.method = method`) handle arbitrary chaining depth.
++
++---
++
++## Latest Lessons Learned (Phase 15)
++
++### 1. Dockerfile Drift — Node Version Mismatch + Malformed Lines
++
++**Issue**: Production Dockerfiles pinned `node:22-alpine` while `package.json` requires Node 24. Additionally, `Dockerfile.worker` had malformed lines (missing newlines: `COPY . .RUN`, `WORKDIR /appENV`), referenced a non-existent `worker:build` script, and copied a non-existent `dist/` directory.
++
++**Fix**: Pinned both Dockerfiles to `node:24-alpine`. Rewrote `Dockerfile.worker` to run `tsx src/workers/index.ts` directly (copying `node_modules` + `src` to the runner stage). Fixed `Dockerfile.dev`/`Dockerfile.worker.dev` (removed non-existent `packages/` copy + corrected script names).
++
++**Lesson**: Dockerfiles must be validated as part of CI — not just visually reviewed. Always pin to the exact Node version specified in `engines.node`. Each Dockerfile instruction (`RUN`, `COPY`, `WORKDIR`) must be on its own line.
++
++### 2. `output: "standalone"` Required for Production Docker
++
++**Issue**: `Dockerfile.web` copied `.next/standalone/server.js` but `next.config.ts` didn't set `output: "standalone"` — the build would fail because the standalone directory wasn't generated.
++
++**Fix**: Added `output: "standalone"` to `next.config.ts` (top-level, alongside `cacheComponents: true`).
++
++**Lesson**: `output: "standalone"` is mandatory when using the standalone Docker pattern. Without it, the Dockerfile references a directory that doesn't exist. Always pair the config flag with the Dockerfile copy step.
++
++### 3. Cursor-Based "Load More" — Server Fetch Initial, Client Fetches Subsequent
++
++**Issue**: `getFeedArticles()` already returned `{ articles, nextCursor, hasMore }` but the UI never surfaced this. The home page had a `TODO: Restore Load More with cursor pagination` comment.
++
++**Fix**: Created `FeedContainer` (client component) that receives `initialArticles` + `initialNextCursor` + `initialHasMore` from the Server Component (`FeedData`). On "Load More" click, it fetches `/api/articles?cursor=...` and appends results. Handles loading, error+retry, and "no more articles" states.
++
++**Lesson**: The Next.js 16 App Router pattern for paginated feeds is: Server Component fetches page 1 (for fast initial render + SEO), Client Component fetches subsequent pages (for interactivity). The `<Suspense>` boundary wraps the Server Component so the page shell renders immediately.
++
++### 4. Dropping a Deprecated Column — Additive Migration Verification
++
++**Issue**: The `keys` column on `push_subscriptions` was marked `@deprecated` in Phase 14 but retained for "backward compat". Phase 15 verified no code reads it (via grep) and dropped it.
++
++**Fix**: Removed `keys` from `schema.ts`, generated migration `0005_neat_wolverine.sql` (`ALTER TABLE push_subscriptions DROP COLUMN keys;`). The TDD-style verification: first removed `keys` from the test mock and confirmed tests still passed (proving no code reads it), THEN removed the column from the schema.
++
++**Lesson**: Before dropping a column, grep the entire `src/` for references. Use the test mock as a canary — if removing the column from the mock doesn't break tests, no code reads it. Always generate a Drizzle migration (`drizzle-kit generate`) rather than writing SQL by hand.
++
++### 5. OAuth Providers — Conditional Configuration for Backward Compat
++
++**Issue**: Adding Google + GitHub OAuth providers naively (always-on) would break existing deployments that don't have OAuth env vars configured — Auth.js would throw at boot.
++
++**Fix**: Extracted `buildProviders()` into a separate module (`src/lib/auth/providers.ts`) that conditionally includes Google/GitHub only when both `CLIENT_ID` and `CLIENT_SECRET` are present. The env vars are `.optional()` in the Zod schema. This preserves backward compat: deployments without OAuth continue to work with Credentials-only auth.
++
++**Lesson**: When adding new auth providers, make them conditional on env vars. The `Provider` type from Auth.js v5 is a union (object form + function form) — use `'id' in p` narrowing to access the `id` property safely in tests.
++
++### 6. Missing `/sign-in` and `/auth-error` Pages — Referenced but Non-Existent
++
++**Issue**: `src/lib/auth/index.ts` had `pages.signIn: "/sign-in"` and `pages.error: "/auth-error"`, but neither page existed. The Credentials flow was broken (no UI to trigger it).
++
++**Fix**: Created `src/app/sign-in/page.tsx` (Server Component that inspects env vars and passes `showGoogle`/`showGithub` to `SignInClient`) + `src/app/sign-in/SignInClient.tsx` (Client Component with OAuth buttons + Credentials form). Created `src/app/auth-error/page.tsx` (simple error landing). Used `<form action="/api/auth/signin/google" method="post">` for OAuth (progressive enhancement — works without client JS).
++
++**Lesson**: Always verify that routes referenced in `pages.signIn`/`pages.error` actually exist. The Auth.js config silently accepts non-existent paths — the failure only appears at runtime when a user is redirected to a 404. Server-action forms (`<form action="..." method="post">`) are the simplest OAuth trigger pattern — no `SessionProvider` or client-side `signIn()` needed.
++
++### 7. Mocking `global.fetch` in Vitest — `vi.stubGlobal` Pattern
++
++**Issue**: Tests for `FeedContainer` (which calls `fetch("/api/articles?cursor=...")`) created a `vi.fn()` mock but never assigned it to `global.fetch`, so the real `fetch` was called (which failed since no server was running).
++
++**Fix**: Used `vi.stubGlobal("fetch", mockFetch)` in `beforeEach()` to replace the global `fetch` with the mock. Reset in `beforeEach` via `mockFetch.mockReset()`.
++
++**Lesson**: `vi.fn()` creates a mock function but doesn't replace anything by itself. For global APIs like `fetch`, use `vi.stubGlobal("fetch", mockFn)`. Always reset between tests to avoid cross-test contamination.
+diff --git a/Dockerfile.dev b/Dockerfile.dev
+index 89648c3..4f40cff 100644
+--- a/Dockerfile.dev
++++ b/Dockerfile.dev
+@@ -12,7 +12,6 @@ WORKDIR /app
+ 
+ # Copy package manifests and lockfile first for better caching
+ COPY package.json pnpm-lock.yaml ./
+-COPY packages/ ./packages/
+ 
+ # Install all dependencies (including dev)
+ RUN pnpm install --frozen-lockfile
+diff --git a/Dockerfile.web b/Dockerfile.web
+index 5657355..1be4f44 100644
+--- a/Dockerfile.web
++++ b/Dockerfile.web
+@@ -1,5 +1,6 @@
+ # Stage 1: Builder
+-FROM node:22-alpine AS builder
++# Pin to Node 24 LTS to match package.json engines.node ">=24.0.0".
++FROM node:24-alpine AS builder
+ WORKDIR /app
+ RUN corepack enable && corepack prepare pnpm@latest --activate
+ COPY package.json pnpm-lock.yaml* ./
+@@ -8,10 +9,13 @@ COPY . .
+ RUN pnpm run build
+ 
+ # Stage 2: Production
+-FROM node:22-alpine AS runner
++# node:24-alpine matches the builder and the project's engine requirement.
++FROM node:24-alpine AS runner
+ WORKDIR /app
+ ENV NODE_ENV=production
+ RUN addgroup -g 1001 -S onestopnews && adduser -S onestopnews -u 1001
++# next.config.ts sets output: "standalone" so .next/standalone contains a
++# self-contained server.js with only the production deps bundled in.
+ COPY --from=builder --chown=onestopnews:onestopnews /app/.next/standalone ./
+ COPY --from=builder --chown=onestopnews:onestopnews /app/.next/static ./.next/static
+ USER onestopnews
+diff --git a/Dockerfile.worker b/Dockerfile.worker
+index 6680df4..509e740 100644
+--- a/Dockerfile.worker
++++ b/Dockerfile.worker
+@@ -1,18 +1,24 @@
+-# Stage 1: Builder
+-FROM node:22-alpine AS builder
++# Stage 1: Builder — install ALL deps (tsx is in devDependencies, needed at runtime)
++FROM node:24-alpine AS builder
+ WORKDIR /app
+ RUN corepack enable && corepack prepare pnpm@latest --activate
+ COPY package.json pnpm-lock.yaml* ./
+-COPY . .RUN pnpm install --frozen-lockfile
+-# Build/compile the worker application
+-RUN pnpm run worker:build 2>/dev/null || echo 'No worker build script'
++RUN pnpm install --frozen-lockfile
++COPY . .
+ 
+ # Stage 2: Production
+-FROM node:22-alpine AS runner
+-WORKDIR /appENV NODE_ENV=production
++# The worker runs `tsx src/workers/index.ts` directly (no compilation step).
++# tsx is required at runtime to handle TypeScript + path alias resolution
++# (the worker imports via "@/lib/...", "@/features/...", etc., which Node's
++# native TypeScript stripping does not resolve).
++FROM node:24-alpine AS runner
++WORKDIR /app
++ENV NODE_ENV=production
+ RUN addgroup -g 1001 -S onestopnews && adduser -S onestopnews -u 1001
+-COPY --from=builder --chown=onestopnews:onestopnews /app/dist ./dist
++# Copy node_modules (contains tsx + all deps), src, and package.json.
+ COPY --from=builder --chown=onestopnews:onestopnews /app/node_modules ./node_modules
++COPY --from=builder --chown=onestopnews:onestopnews /app/src ./src
++COPY --from=builder --chown=onestopnews:onestopnews /app/tsconfig.json ./tsconfig.json
+ COPY --from=builder --chown=onestopnews:onestopnews /app/package.json ./
+ USER onestopnews
+-CMD ["node", "dist/workers/index.js"]
++CMD ["npx", "tsx", "src/workers/index.ts"]
+diff --git a/Dockerfile.worker.dev b/Dockerfile.worker.dev
+index 1af2263..c0e5c90 100644
+--- a/Dockerfile.worker.dev
++++ b/Dockerfile.worker.dev
+@@ -10,7 +10,6 @@ WORKDIR /app
+ 
+ # Copy package manifests
+ COPY package.json pnpm-lock.yaml ./
+-COPY packages/ ./packages/
+ 
+ RUN pnpm install --frozen-lockfile
+ 
+@@ -24,7 +23,7 @@ USER onestopnews
+ # Healthcheck – simple process check (worker has no HTTP endpoint, so we check the process)
+ # We'll rely on Docker's process monitoring; a custom healthcheck could use `pgrep` but it's optional.
+ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+-  CMD pgrep -f "tsx watch src/workers/index.ts" || exit 1
++  CMD pgrep -f "tsx src/workers/index.ts" || exit 1
+ 
+-# Start worker with watch mode for hot reload
+-CMD ["pnpm", "worker:dev"]
++# Start worker with tsx watch mode for hot reload
++CMD ["pnpm", "exec", "tsx", "watch", "src/workers/index.ts"]
+diff --git a/README.md b/README.md
+index e853e55..1050a1e 100644
+--- a/README.md
++++ b/README.md
+@@ -149,97 +149,155 @@ Every request passes through exactly these layers. Deviating from this order cre
+ ## File Hierarchy
+ 
+ ```
+-onestopnews-web/
++onestopnews/
+ ├── 📄 proxy.ts                  ← Network boundary (Layer 0): cookie check + redirect only
+-├── 📄 next.config.ts            ← Cache Components, cacheLife profiles, Turbopack, experimental flags
++├── 📄 next.config.ts            ← Cache Components, cacheLife profiles, Turbopack, output: "standalone", experimental flags
+ ├── 📄 drizzle.config.ts         ← Drizzle kit: schema path, migration output
++├── 📄 tsconfig.json             ← strict, noUncheckedIndexedAccess, verbatimModuleSyntax, erasableSyntaxOnly
++├── 📄 vitest.config.ts          ← Vitest config (excludes e2e/, playwright.config.ts)
++├── 📄 eslint.config.mjs         ← ESLint flat config (excludes e2e/, playwright.config.ts)
++├── 📄 playwright.config.ts      ← Playwright E2E config (Chromium/Firefox/WebKit, auto-start dev server)
+ │
+ ├── 📂 app/                      ← Next.js App Router (Layer 1)
+-│   ├── 📄 layout.tsx            ← Root layout: fonts, providers. No data fetching.
+-│   ├── 📂 (public)/             ← Unauthenticated routes
+-│   │   ├── 📄 page.tsx          ← / — 10-section landing page (Phase 10)
+-│   │   │   ├── NewsTicker       ← Animated breaking headlines marquee
+-│   │   │   ├── Masthead         ← Edition bar, wordmark, live badge
+-│   │   │   ├── LeadStory        ← 7:5 grid hero with breaking badge
+-│   │   │   ├── Feed             ← Article card grid (PPR)
+-│   │   │   ├── AI Nutrition     ← Transparency panel for AI summaries
+-│   │   │   ├── Stats            ← Trust indicators (247, 1.2M, 450K)
+-│   │   │   ├── FAQ              ← Accordion with 6 Q&A items
+-│   │   │   └── Newsletter       ← Email signup CTA
+-│   │   ├── 📂 topics/[category]/← /topics/:category — PPR + Cache Component
+-│   │   ├── 📂 article/[id]/     ← /article/:id — Fully dynamic (summary status)
+-│   │   └── 📂 search/           ← /search — Full-text search (Phase 6)
++│   ├── 📄 layout.tsx            ← Root layout: Newsreader + Instrument Sans + Commit Mono fonts, RevealProvider
++│   ├── 📄 globals.css           ← Tailwind v4 @theme tokens, .font-editorial, .cat-label, .btn-ember, .reveal
++│   ├── 📂 (public)/             ← Unauthenticated public routes
++│   │   ├── 📄 page.tsx          ← / — 10-section landing page (Phase 10): NewsTicker, Masthead, Header, LeadStory,
++│   │   │                          Feed (Suspense + FeedData), NutritionLabelDemo, StatsSection, Accordion, NewsletterCTA, Footer
++│   │   └── 📂 search/           ← /search — Full-text search (Phase 6): page.tsx + SearchPageClient.tsx
++│   ├── 📂 topics/[category]/    ← /topics/:category — PPR + Cache Component (NOT inside (public) route group)
++│   ├── 📂 article/[id]/         ← /article/:id — Fully dynamic, generateMetadata emits 3-layer provenance (Phase 14)
++│   ├── 📂 sign-in/              ← /sign-in — Sign-in page (Phase 15): page.tsx (Server) + SignInClient.tsx (Client)
++│   ├── 📂 auth-error/           ← /auth-error — Auth error landing (Phase 15, referenced in pages.error)
+ │   ├── 📂 (admin)/              ← Protected admin routes
+-│   │   ├── 📄 layout.tsx        ← Admin layout: verifies session via auth()
+-│   │   ├── 📂 sources/          ← /admin/sources — Source management (Phase 6)
++│   │   ├── 📄 layout.tsx        ← Admin layout: verifies session via verifyAdminSession()
++│   │   ├── 📂 sources/          ← /admin/sources — Source management (Phase 6): page.tsx + actions.ts
+ │   │   └── 📂 summaries/        ← /admin/summaries — Summary review (Phase 6)
+ │   └── 📂 api/                  ← Route Handlers: public HTTP API
+-│       ├── 📂 articles/         ← GET /api/articles (feed + search, Phase 6; rate limited + cursor validation Phase 13)
++│       ├── 📂 articles/         ← GET /api/articles (feed + search, Phase 6; rate limited + cursor validation Phase 13; TRUSTED_PROXY Phase 14)
+ │       ├── 📂 categories/       ← GET /api/categories (Phase 13)
+ │       ├── 📂 health/           ← GET /api/health — DB + Redis health check
+-│       ├── 📂 push/subscribe/   ← POST /api/push/subscribe (Phase 7)
+-│       └── 📂 summarize/[id]/   ← POST /api/summarize/:id (enqueue only)
++│       ├── 📂 push/subscribe/   ← POST /api/push/subscribe (Phase 7; encryptedKeys column Phase 14)
++│       ├── 📂 summarize/[id]/   ← POST /api/summarize/:id (enqueue only, content guard)
++│       ├── 📂 admin/            ← GET /api/admin — stub endpoint (Phase 4)
++│       └── 📂 auth/[[...nextauth]]/ ← Auth.js v5 catch-all route (GET + POST handlers)
+ │
+ ├── 📂 features/                 ← Feature modules (Layer 2)
+ │   ├── 📂 feed/
+-│   │   ├── 📂 components/       ← Feed.tsx, ArticleCard.tsx, TopicNav.tsx, **NewsTicker.tsx**, **Masthead.tsx**, **LeadStory.tsx**, **Stats.tsx**, **FAQ.tsx**, **Newsletter.tsx**
+-│   │   ├── 📂 ai/               ← AI NutritionLabel.tsx (transparency panel)
+-│   │   ├── 📂 stats/            ← Stats.tsx (trust indicators)
+-│   │   ├── 📂 faq/              ← FAQ.tsx (accordion)
+-│   │   ├── 📂 newsletter/       ← Newsletter.tsx (email CTA)
+-│   │   ├── 📄 queries.ts        ← Drizzle queries with explicit sources JOIN
+-│   │   └── 📄 actions.ts        ← Server Actions: savePreference, setFavoriteCategory
++│   │   ├── 📂 components/       ← ArticleCard, FeedGrid, FeedData, FeedSkeleton, LeadStory,
++│   │   │                          FeedContainer (Phase 15), LoadMoreButton (Phase 15)
++│   │   └── 📄 queries.ts        ← getFeedArticles() with cursor pagination, "use cache" + cacheLife('feed')
++│   ├── 📂 articles/             ← Article detail feature (Phase 14)
++│   │   ├── 📂 components/       ← ArticleData.tsx, ArticleSkeleton.tsx
++│   │   └── 📄 queries.ts        ← getArticleWithSummary() — 4-way JOIN
+ │   ├── 📂 summaries/
+-│   │   ├── 📂 components/       ← NutritionLabel.tsx, SummaryPanel.tsx, DisclosureBadge.tsx
+-│   │   └── 📄 actions.ts        ← Server Action: requestSummary
+-│   └── 📂 search/               ← (Phase 6)
+-│       ├── 📂 components/       ← SearchBar.tsx (client), SearchResults.tsx (RSC)
+-│       ├── 📄 queries.ts          ← FTS query builder (tsvector + ts_rank_cd BM25)
+-│       └── 📄 types.ts            ← SearchResult, SearchPage, SearchParams
++│   │   ├── 📂 components/       ← NutritionLabel, NutritionLabelDemo, SummaryPanel, DisclosureBadge,
++│   │   │                          SummariesData, SummariesSkeleton
++│   │   ├── 📂 lib/              ← summariseSchema.ts (Zod schema for AI output)
++│   │   ├── 📄 actions.ts        ← Server Action: requestSummary
++│   │   └── 📄 queries.ts        ← Summary queries
++│   ├── 📂 search/               ← (Phase 6)
++│   │   ├── 📂 components/       ← SearchBar (client), SearchResults, SearchData, SearchSkeleton
++│   │   ├── 📄 queries.ts        ← FTS query builder (tsvector + ts_rank_cd BM25)
++│   │   ├── 📄 actions.ts        ← Server Actions
++│   │   └── 📄 types.ts          ← SearchResult, SearchPage, SearchParams
++│   └── 📂 sources/              ← Admin source management
++│       └── 📂 components/       ← SourcesData, SourcesSkeleton
+ │
+-├── 📂 domain/                   ← Pure domain logic (Layer 3)
+-│   ├── 📂 articles/normalize.ts ← URL normalization, SHA-256 content hashing (Phase 13)
+-│   └── 📂 ranking/score.ts      ← Importance scoring formula
++├── 📂 domain/                   ← Pure domain logic (Layer 3 — no Next.js / DB imports)
++│   ├── 📂 articles/
++│   │   ├── 📄 normalize.ts      ← normalizeCanonicalUrl, hashContent(title, body, publishedAt) SHA-256
++│   │   └── 📄 types.ts          ← Article, Source, Category, Summary, ArticleWithSource, ArticleWithSummary, FeedPage
++│   └── 📂 ranking/
++│       └── 📄 score.ts          ← calculateImportanceScore() returns float 0.0–1.0
+ │
+ ├── 📂 lib/                      ← Infrastructure integrations (Layer 4)
+ │   ├── 📂 db/
+ │   │   ├── 📄 index.ts          ← Lazy Proxy DB client (defers connection to first query)
+-│   │   ├── 📄 schema.ts         ← Complete Drizzle schema: 11 tables (8 business + 3 Auth.js adapter)
+-│   │   └── 📄 seed.ts           ← Database seed script (Phase 10): sample articles, categories, sources
++│   │   ├── 📄 auth.ts           ← Eager Drizzle instance for Auth.js DrizzleAdapter
++│   │   ├── 📄 schema.ts         ← Drizzle schema: 11 tables (8 business + 3 Auth.js adapter), 4 enums
++│   │   └── 📄 seed.ts           ← Idempotent seed script (Phase 10): 7 categories, 7 sources, 30 articles
+ │   ├── 📂 queue/
+-│   │   ├── 📄 index.ts          ← BullMQ Queue instances (producer side) + split Worker/Queue connection configs
++│   │   ├── 📄 index.ts          ← BullMQ Queue instances + split Worker/Queue connection configs (4 queues)
+ │   │   └── 📄 flows.ts          ← FlowProducer atomic DAG: ingest → score → refresh-feed-slice (Phase 13)
+ │   ├── 📂 ai/
+ │   │   ├── 📄 prompts.ts        ← Prompt templates with Zod response schemas
+ │   │   └── 📄 provenance.ts     ← 3-layer AI provenance generator (JSON-LD + HTTP header + meta)
+ │   ├── 📂 auth/
+-│   │   ├── 📄 index.ts          ← Auth.js v5 server instance
+-│   │   └── 📄 dal.ts            ← Data Access Layer: verifySession(), verifyAdminSession()
++│   │   ├── 📄 index.ts          ← Auth.js v5 NextAuth() config (DrizzleAdapter, JWT strategy, callbacks)
++│   │   ├── 📄 dal.ts            ← Data Access Layer: verifySession(), verifyAdminSession() (cache()-memoized)
++│   │   └── 📄 providers.ts      ← buildProviders() — conditional Credentials + Google + GitHub (Phase 15)
+ │   ├── 📂 env/
+-│   │   └── 📄 index.ts          ← Zod-validated environment variables (fails fast at module load)
++│   │   └── 📄 index.ts          ← Zod-validated env vars (fails fast at module load); OAuth vars optional
+ │   ├── 📂 security/
+ │   │   └── 📄 encrypt.ts        ← AES-256-GCM push key encryption (Phase 7)
+-│   └── 📄 rateLimit.ts          ← Redis fixed-window rate limiter (Phase 13)
++│   └── 📄 rateLimit.ts          ← Redis fixed-window rate limiter (Phase 13, singleton publisher)
+ │
+-├── 📂 workers/                  ← Worker service (separate Node.js process)
+-│   ├── 📄 index.ts              ← 4 BullMQ workers (ingest/summarize/score/feed-slice) + graceful shutdown
++├── 📂 workers/                  ← Worker service (separate Node.js process, runs via `pnpm worker`)
++│   ├── 📄 index.ts              ← 4 BullMQ workers (ingest=50, summarize=5, score=20, feedSlice=10) + graceful shutdown
+ │   ├── 📂 jobs/
+ │   │   ├── 📄 parseFeed.ts      ← RSS/Atom/JSON Feed parser via rss-parser (Phase 13)
+ │   │   ├── 📄 summarize.ts      ← AI summarization via Vercel AI SDK (Anthropic + OpenAI fallback) (Phase 13)
++│   │   ├── 📄 summarizeFailure.ts ← getSummaryFailureState() — needs_review after 3 retries (Phase 14)
+ │   │   ├── 📄 determineContentAvailability.ts ← Content availability guard (Phase 7)
+ │   │   └── 📄 scheduler.ts      ← Idempotent job scheduler via upsertJobScheduler()
+ │   ├── 📂 push/
+ │   │   └── 📄 isWithinQuietHours.ts ← DST-safe quiet hours via luxon (Phase 7)
++│   ├── 📂 lib/
++│   │   └── 📄 cacheInvalidation.ts ← Redis pub/sub cache invalidation (singleton publisher, Phase 13)
++│   └── 📄 pipeline.integration.test.ts ← 8 integration tests (parseFeed → score → hashContent) (Phase 14)
++│
++├── 📂 shared/                   ← Shared UI primitives (Layer 2 — cross-feature)
++│   ├── 📂 components/
++│   │   ├── 📂 layout/           ← Header, Footer, Masthead, NewsTicker
++│   │   ├── 📂 ui/               ← Button (cva+Radix Slot), Badge, Skeleton, StatsSection, Accordion, NewsletterCTA
++│   │   └── 📂 providers/        ← RevealProvider (IntersectionObserver scroll-reveal)
++│   ├── 📂 hooks/                ← useDebounce, useReducedMotion
+ │   └── 📂 lib/
+-│       └── 📄 cacheInvalidation.ts ← Redis pub/sub cache invalidation (singleton publisher, Phase 13)
++│       └── 📄 utils.ts          ← cn() (clsx + tailwind-merge), formatTimeAgo, formatDate, truncate
++│
++├── 📂 components/
++│   └── 📂 primitives/
++│       └── 📄 PageTransition.tsx ← View Transitions abstraction (progressive enhancement)
++│
++├── 📂 drizzle/                  ← Drizzle migrations (additive only — never `push` in production)
++│   ├── 📄 0000_purple_blue_marvel.sql  ← Initial schema
++│   ├── 📄 0001_panoramic_makkari.sql
++│   ├── 📄 0002_flippant_screwball.sql
++│   ├── 📄 0003_strong_mac_gargan.sql   ← articles.body + users.email_verified + users.image (Phase 13)
++│   ├── 📄 0004_smiling_newton_destine.sql ← push_subscriptions.encrypted_keys + DROP NOT NULL keys (Phase 14)
++│   ├── 📄 0005_neat_wolverine.sql      ← DROP COLUMN keys (Phase 15)
++│   ├── 📄 custom-indexes.sql           ← GIN FTS + pg_trgm + performance indexes
++│   └── 📂 meta/                        ← Drizzle migration journal + snapshots
++│
++├── 📂 e2e/                      ← Playwright E2E tests (excluded from vitest/eslint/tsc)
++│   └── 📄 smoke.spec.ts         ← 10 E2E smoke tests (Phase 14)
++│
++├── 📂 public/fonts/             ← Self-hosted Commit Mono woff2 (extracted from @fontsource/commit-mono)
++│
++├── 📂 scripts/                  ← Operational scripts
++│   ├── 📄 init-extensions.sql   ← CREATE EXTENSION uuid-ossp, pg_trgm
++│   ├── 📄 migrate.ts            ← Migration runner
++│   ├── 📄 dev-setup.sh          ← Development environment setup
++│   └── 📄 deploy.sh             ← Tagged release deployment script
+ │
+-└── 📂 shared/
+-    ├── 📂 components/           ← Shadcn UI wrapped for bespoke "Editorial Dispatch" aesthetic
+-    └── 📂 hooks/
+-        ├── 📄 useDebounce.ts    ← 300ms debounce for search input
+-        └── 📄 useReducedMotion.ts ← MediaQueryList API for prefers-reduced-motion
++├── 📂 .github/workflows/        ← CI/CD pipelines
++│   ├── 📄 ci.yml                ← Lint + tsc + vitest + build (Node 24, all 15 env vars)
++│   └── 📄 e2e.yml               ← Playwright E2E on Chromium/Firefox/WebKit
++│
++├── 📄 Dockerfile.web            ← Production web image (node:24-alpine, output: "standalone") (Phase 15)
++├── 📄 Dockerfile.worker         ← Production worker image (node:24-alpine, tsx src/workers/index.ts) (Phase 15)
++├── 📄 Dockerfile.dev            ← Dev web image (node:24-alpine, pnpm dev --turbo)
++├── 📄 Dockerfile.worker.dev     ← Dev worker image (node:24-alpine, tsx watch)
++├── 📄 docker-compose.prod.yml   ← Production: web + worker + PostgreSQL 17 + Redis 7
++├── 📄 docker-compose-dev.yml    ← Development compose
++├── 📄 lighthouserc.js           ← Lighthouse CI budgets (Perf ≥90, A11y ≥95)
++├── 📄 .env.example              ← All env vars with comments (incl. optional OAuth)
++└── 📄 .dockerignore             ← Excludes node_modules, .git, .env*
+ ```
+ 
++**Note on route group placement:** `/topics/[category]` and `/article/[id]` live at the top level of `app/`, NOT inside the `(public)` route group. The `(public)` group only contains the home page and `/search`.
++
+ ---
+ 
+ ## Design System — "Editorial Dispatch"
+@@ -369,7 +427,7 @@ pnpm worker
+ | `curl -H "x-forwarded-for: 1.2.3.4" "http://localhost:3000/api/articles?cursor=invalid"` | `400` with `{ error: "Invalid cursor format..." }` |
+ | BullMQ dashboard at `http://localhost:3001` | Active queues: `ingest`, `summarize`, `score`, `feed-slice` |
+ | `pnpm tsc --noEmit` | Zero type errors |
+-| `pnpm test` | All 251 tests pass across 45 suites |
++| `pnpm test` | All 279 tests pass across 49 suites |
+ 
+ ---
+ 
+@@ -415,6 +473,21 @@ NODE_ENV=development  # development | production | test
+ # When unset (default), uses the leftmost IP (client-supplied, spoofable).
+ TRUSTED_PROXY=  # "true" | unset
+ 
++# ── OAuth Providers (Optional) ───────────────────────────
++# Leave blank to use Credentials-only auth (backward compatible).
++# When both CLIENT_ID and CLIENT_SECRET for a provider are set, that
++# provider is enabled on the /sign-in page.
++#
++# Google OAuth: https://console.cloud.google.com/apis/credentials
++# Authorized redirect URI: ${AUTH_URL}/api/auth/callback/google
++GOOGLE_CLIENT_ID=
++GOOGLE_CLIENT_SECRET=
++
++# GitHub OAuth: https://github.com/settings/developers
++# Authorization callback URL: ${AUTH_URL}/api/auth/callback/github
++GITHUB_CLIENT_ID=
++GITHUB_CLIENT_SECRET=
++
+ # ── Observability (Optional) ──────────────────────────────
+ SENTRY_DSN=
+ AXIOM_TOKEN=
+@@ -437,6 +510,8 @@ AXIOM_TOKEN=
+ | `/article/[id]` | `GET` | Public | Article detail page. Emits 3-layer AI provenance via `generateMetadata()` when summary exists. (Phase 14) |
+ | `/admin/sources` | `GET/POST` | Admin | Source management dashboard + CRUD. |
+ | `/admin/summaries` | `GET` | Admin | Summary review queue for flagged content (incl. AI-failed summaries after Phase 14). |
++| `/sign-in` | `GET` | Public | Sign-in page with Credentials form + conditional Google/GitHub OAuth buttons (Phase 15). |
++| `/auth-error` | `GET` | Public | Auth error landing page (referenced by Auth.js `pages.error`). |
+ 
+ **Rate Limiting (Phase 13+14):** `GET /api/articles` is rate-limited to 20 requests/second per IP via Redis fixed-window counter (`src/lib/rateLimit.ts`). Exceeding the limit returns `429 Too Many Requests` with `Retry-After` and `X-RateLimit-Remaining` headers. Set `TRUSTED_PROXY=true` when behind a CDN to use the rightmost IP from `x-forwarded-for` (prevents spoofing).
+ 
+@@ -1012,6 +1087,67 @@ if (!result.success) {
+ **Cause 3**: The `articles.searchVector` GIN index is missing or corrupted.
+ **Fix**: Verify the index exists: `SELECT indexname FROM pg_indexes WHERE tablename = 'articles';`.
+ 
++### Docker Build Fails with "Cannot find module" or "dist/workers/index.js" (Phase 15)
++
++**Symptom**: `docker build -f Dockerfile.worker -t onestopnews-worker .` fails with `Cannot find module '/app/dist/workers/index.js'` or references to `worker:build` script.
++
++**Cause**: The Dockerfile was written before Phase 15 — it referenced a non-existent `worker:build` script and copied a non-existent `dist/` directory. Phase 15 rewrote the Dockerfile to run `tsx src/workers/index.ts` directly.
++
++**Fix**: Ensure you're using the Phase 15 Dockerfile (pinned to `node:24-alpine`, `CMD ["npx", "tsx", "src/workers/index.ts"]`). If you have local changes, discard them: `git checkout Dockerfile.worker`.
++
++**Prevention**: The Dockerfile copies `node_modules` from the builder stage (which installs ALL deps including `tsx` in devDependencies). Never strip devDependencies in the builder — `tsx` is required at runtime.
++
++### Docker Build Fails with ".next/standalone not found" (Phase 15)
++
++**Symptom**: `docker build -f Dockerfile.web -t onestopnews-web .` fails at the `COPY --from=builder /app/.next/standalone ./` step.
++
++**Cause**: `next.config.ts` doesn't have `output: "standalone"` set, so Next.js doesn't generate the standalone directory during `next build`.
++
++**Fix**: Phase 15 added `output: "standalone"` to `next.config.ts` (top-level, alongside `cacheComponents: true`). Verify it's present:
++```bash
++grep 'output: "standalone"' next.config.ts
++```
++If missing, add it and rebuild.
++
++### OAuth Sign-In Button Not Appearing on /sign-in Page (Phase 15)
++
++**Symptom**: The `/sign-in` page shows only the Credentials form — no "Sign in with Google" or "Sign in with GitHub" buttons.
++
++**Cause**: The OAuth env vars (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`) are not set in the environment. The sign-in page uses `showGoogle`/`showGithub` props derived from env var presence.
++
++**Fix**: Set the env vars in `.env.local` (or your deployment env):
++```bash
++GOOGLE_CLIENT_ID=your-google-client-id
++GOOGLE_CLIENT_SECRET=your-google-client-secret
++GITHUB_CLIENT_ID=your-github-client-id
++GITHUB_CLIENT_SECRET=your-github-client-secret
++```
++Then restart the dev server. The buttons will appear automatically.
++
++**Note**: Both `CLIENT_ID` AND `CLIENT_SECRET` must be set for a given provider. Setting only one will NOT enable the provider (defensive — partial config is silently ignored).
++
++### OAuth Callback URL Mismatch (Phase 15)
++
++**Symptom**: Clicking "Sign in with Google" redirects to Google but returns an error like "Redirect URI mismatch" after consent.
++
++**Cause**: The OAuth provider's configured redirect URI doesn't match `${AUTH_URL}/api/auth/callback/google`.
++
++**Fix**: In the Google Cloud Console (or GitHub OAuth Apps), set the authorized redirect URI to exactly:
++- Google: `${AUTH_URL}/api/auth/callback/google` (e.g., `http://localhost:3000/api/auth/callback/google`)
++- GitHub: `${AUTH_URL}/api/auth/callback/github`
++
++The `AUTH_URL` env var must match the URL users actually visit (including scheme + host + port).
++
++### "Load More" Button Not Appearing on Home Feed (Phase 15)
++
++**Symptom**: The home feed shows 6 articles but no "Load More" button appears below them.
++
++**Cause 1**: There are no more articles in the database (less than 7 total). The `LoadMoreButton` is hidden when `hasMore` is false.
++
++**Cause 2**: The `FeedData` Server Component didn't pass `initialNextCursor` and `initialHasMore` to `FeedContainer`. This was the pre-Phase-15 behavior.
++
++**Fix**: Run `pnpm db:seed` to populate 30 sample articles. Verify the `FeedData.tsx` component renders `<FeedContainer initialArticles={feed.articles} initialNextCursor={feed.nextCursor} initialHasMore={feed.hasMore} />`.
++
+ ---
+ 
+ ## Recommendations
+@@ -1030,7 +1166,7 @@ if (!result.success) {
+ 
+ 7. **Provenance Verification**: Periodically verify all three provenance layers (JSON-LD, HTTP header, meta tag) are correctly generated and conform to EU AI Act Art. 50 requirements. Consider automating this in CI. The article detail page (`/article/[id]`) now emits all 3 layers via `generateMetadata()` when a summary exists (Phase 14).
+ 
+-8. **Test Suite Growth**: Phase 5 added 47 tests; Phase 6 added 4 tests; Phase 7 added 21 tests; Phase 13 added 39 tests; Phase 14 added 39 tests (article queries: 4, ArticleData component: 8, push subscribe: 6, rate limiter IP: 5, hashContent body: 3, summarizeFailure: 6, pipeline integration: 8, minus removed hardcoded vector: -1). Current total: **251 tests across 45 suites** + 10 Playwright E2E tests. Monitor test duration — currently ~13s; if it exceeds 30s, investigate slow tests.
++8. **Test Suite Growth**: Phase 5 added 47 tests; Phase 6 added 4 tests; Phase 7 added 21 tests; Phase 13 added 39 tests; Phase 14 added 39 tests (article queries: 4, ArticleData component: 8, push subscribe: 6, rate limiter IP: 5, hashContent body: 3, summarizeFailure: 6, pipeline integration: 8, minus removed hardcoded vector: -1); Phase 15 added 28 tests (LoadMoreButton: 5, FeedContainer: 8, providers: 6, SignInClient: 9). Current total: **279 tests across 49 suites** + 10 Playwright E2E tests. Monitor test duration — currently ~13s; if it exceeds 30s, investigate slow tests.
+ 
+ 9. **BM25 Search Tuning**: The `ts_rank_cd('{0.1, 0.2, 0.4, 1.0}', ...)` weights may need adjustment based on real user queries. Consider A/B testing different weight configurations.
+ 
+@@ -1038,19 +1174,19 @@ if (!result.success) {
+ 
+ 11. **CI Pipeline Monitoring**: Monitor GitHub Actions pipeline duration. If it exceeds 10 minutes, investigate slow steps (likely `npx playwright install --with-deps`). Phase 13 fixed the CI workflow to use Node 24 + all required env vars — verify CI passes on next push.
+ 
+-12. **Docker Image Size**: Monitor Docker image sizes. If the web image exceeds 500MB, investigate `node_modules` pruning or multi-stage build optimization.
++12. **Docker Image Size**: Monitor Docker image sizes. If the web image exceeds 500MB, investigate `node_modules` pruning or multi-stage build optimization. Phase 15 added `output: "standalone"` to `next.config.ts` which bundles only production deps — verify the resulting image size.
+ 
+ 13. **Lighthouse CI Budgets**: Start with conservative budgets (Perf ≥ 90, A11y ≥ 95) and tighten as the app matures. PPR helps with performance but heavy AI components can slow LCP.
+ 
+ 14. **Blocking Route Prevention**: In Next.js 16 with `cacheComponents: true`, always wrap database queries in `<Suspense>` with a fallback UI (e.g., `FeedSkeleton`). Never `await` data fetches directly in the main page component body — this triggers the `blocking-route` error.
+ 
+-15. **Article Detail Page** (Phase 14 candidate): The article detail page (`src/app/article/[id]/page.tsx` + `ArticleData.tsx`) is still a placeholder rendering hardcoded mock data. Wire it to fetch via `getArticleWithSummary(id)`, render `SummaryPanel` + `NutritionLabel`, and call `generateProvenanceMetadata()` in `generateMetadata()` to emit all 3 provenance layers.
++15. **~~Article Detail Page~~** (RESOLVED — Phase 14): The article detail page now fetches real data via `getArticleWithSummary(id)`, renders `SummaryPanel` + `NutritionLabel`, and emits 3-layer provenance via `generateMetadata()`.
+ 
+-16. **RSS Ingestion E2E Test** (Phase 14 candidate): Phase 13 implemented `parseFeed` with unit tests, but no integration test verifies the full ingest pipeline (fetch → parse → upsert → score → cache invalidation). Add an integration test that mocks `fetch` returning a sample RSS feed and runs `processIngestJob` end-to-end.
++16. **~~RSS Ingestion E2E Test~~** (RESOLVED — Phase 14): Phase 14 created `src/workers/pipeline.integration.test.ts` (8 tests) that exercises the full pipeline: `parseFeed → determineContentAvailability → hashContent → content change detection`. Also created `e2e/smoke.spec.ts` (10 E2E tests) for browser-level verification.
+ 
+ 17. **Token Usage Monitoring**: The `summarize.ts` worker tracks `tokensUsed` per summary. Monitor aggregate token usage in production to verify the AI SDK v6 `usage` field is populated correctly for both Anthropic and OpenAI, and to catch unexpected cost spikes.
+ 
+-18. **Rate Limit Identifier Hardening**: The current rate limiter uses `x-forwarded-for` IP. Behind a CDN (e.g., Cloudflare), this header may contain multiple IPs or be spoofed. Consider also checking `x-real-ip` or using a signed CDN IP header in production.
++18. **~~Rate Limit Identifier Hardening~~** (RESOLVED — Phase 14): The rate limiter now supports `TRUSTED_PROXY=true` env var. When set, uses the rightmost IP from `x-forwarded-for` (the trusted proxy's view of the client), preventing spoofing. When unset, uses the leftmost IP (documented as spoofable for direct-exposure deployments).
+ 
+ ---
+ 
+@@ -1078,6 +1214,32 @@ if (!result.success) {
+ 
+ **Status**: RESOLVED. Phase 14 created `src/workers/pipeline.integration.test.ts` (8 tests) that exercises the full pipeline: `parseFeed → determineContentAvailability → hashContent → content change detection`. Also created `playwright.config.ts` + `e2e/smoke.spec.ts` (10 E2E tests) for browser-level verification.
+ 
++### ~~Dockerfile Drift~~ (RESOLVED — Phase 15)
++
++**Status**: RESOLVED. Phase 15 pinned both production Dockerfiles to `node:24-alpine` (matching `engines.node: ">=24.0.0"`), added `output: "standalone"` to `next.config.ts`, rewrote `Dockerfile.worker` to run `tsx src/workers/index.ts` directly (fixing malformed lines + non-existent `worker:build` script + missing `dist/`), and fixed `Dockerfile.dev`/`Dockerfile.worker.dev` (removed non-existent `packages/` copy + corrected script names).
++
++### ~~Missing Sign-In / Auth-Error Pages~~ (RESOLVED — Phase 15)
++
++**Status**: RESOLVED. Phase 15 created `src/app/sign-in/page.tsx` (Server Component) + `SignInClient.tsx` (Client Component) with OAuth buttons + Credentials form, and `src/app/auth-error/page.tsx`. The Auth.js config referenced these routes via `pages.signIn`/`pages.error` but they didn't exist before Phase 15.
++
++### ~~Deprecated `keys` Column on `push_subscriptions`~~ (RESOLVED — Phase 15)
++
++**Status**: RESOLVED. Phase 15 dropped the deprecated `keys` jsonb column via migration `0005_neat_wolverine.sql` (`ALTER TABLE push_subscriptions DROP COLUMN keys;`). Verified via grep that no code reads the column before dropping.
++
++### Add Sign-In / Sign-Out Button to Header (Future Enhancement)
++
++**Status**: Open. The `/sign-in` page now exists (Phase 15) but there's no sign-in/sign-out button in the `Header` component. Users must navigate to `/sign-in` manually. Adding a button to the header would improve UX discoverability.
++
++**Suggested approach**: Add a conditional button to `src/shared/components/layout/Header.tsx` that shows "Sign In" when unauthenticated (links to `/sign-in`) and "Sign Out" when authenticated (calls `signOut()` server action). Use `auth()` from `@/lib/auth` in a Server Component wrapper to determine auth state.
++
++### Extend Load More to Topic Pages (Future Enhancement)
++
++**Status**: Open. Phase 15 added cursor-based "Load More" pagination to the home feed (`FeedContainer` + `LoadMoreButton`). The topic pages (`/topics/[category]`) still render only the initial page. Consider reusing `FeedContainer` on topic pages for consistency.
++
++### OAuth Account Linking (Future Enhancement)
++
++**Status**: Open. Phase 15 added Google + GitHub OAuth providers, but there's no UI for linking an OAuth account to an existing Credentials account. If a user signs in with Credentials first and later tries OAuth with the same email, Auth.js will create a separate account. Consider adding an account-linking flow in a user settings page.
++
+ ### Test Flakiness Risk
+ 
+ **Impact**: Low — `useOptimistic` tests may be timing-sensitive due to React's internal batching and transition scheduling.
+@@ -1091,7 +1253,7 @@ if (!result.success) {
+ | Phase | Status | Key Deliverables |
+ | :--- | :--- | :--- |
+ | **Phase 1** — Foundation & Configuration | **COMPLETE** | next.config.ts, proxy.ts, tsconfig.json, docker-compose |
+-| **Phase 2** — Database Schema & Infrastructure | **COMPLETE** | Drizzle schema (10 tables), lazy DB client, Auth.js v5, BullMQ queues |
++| **Phase 2** — Database Schema & Infrastructure | **COMPLETE** | Drizzle schema (11 tables: 8 business + 3 Auth.js adapter), lazy DB client, Auth.js v5, BullMQ queues |
+ | **Phase 3** — Design System & Shared Components | **COMPLETE** | Button, Badge, Skeleton, Header, Footer, useDebounce, useReducedMotion, PageTransition |
+ | **Phase 4** — Core Feed Feature | **COMPLETE** | Domain layer, feed queries, FeedGrid, ArticleCard, home/topic/article routes |
+ | **Phase 5** — AI Summarisation Pipeline | **COMPLETE** | Zod schema, prompts, 3-layer provenance, NutritionLabel, SummaryPanel, actions, API endpoint |
+@@ -1104,6 +1266,7 @@ if (!result.success) {
+ | **Phase 12** — Tailwind v4 PostCSS & Commit Mono Font Fix | **COMPLETE** | `@tailwindcss/postcss` + `postcss.config.mjs`, Commit Mono via `next/font/local`, `.font-editorial` enhancement, `.next` cache clear |
+ | **Phase 13** — Critical Gaps Remediation | **COMPLETE** | Real RSS/Atom/JSON parser (`rss-parser`), real AI summarization (Vercel AI SDK: Anthropic primary + OpenAI fallback), `FlowProducer` atomic DAG (ingest → score → refresh-feed-slice), `/api/articles` cursor validation + Redis rate limiting (20 req/s per IP), `hashContent` upgraded to SHA-256, `/api/categories` endpoint, `cacheInvalidation` singleton publisher, CI workflow fixed (Node 24 + all env vars), UI CSS class corruption fixes, `accountablePerson.name` provenance fidelity, `body` column added to articles schema, content-change-detection upserts |
+ | **Phase 14** — Validated Gaps Closure | **COMPLETE** | `hashContent` includes body (content-only updates detected), rate limiter `TRUSTED_PROXY` env var (rightmost IP for CDN), property-based `node:crypto` SHA-256 test (replaced hardcoded vector), `pushSubscriptions.encryptedKeys` column (replaced misleading `keys.p256dh` convention), article detail page with real data fetch + `SummaryPanel` + 3-layer provenance via `generateMetadata()`, Playwright config + 10 E2E smoke tests, 8 pipeline integration tests, `getSummaryFailureState` (permanent failure → `needs_review` after 3 retries), `e2e/` excluded from vitest/ESLint/tsc (**251 tests across 45 suites** + 10 E2E) |
++| **Phase 15** — Production Readiness (Dockerfiles, Load More, Drop keys, OAuth) | **COMPLETE** | Pinned both production Dockerfiles to `node:24-alpine` + added `output: "standalone"` to `next.config.ts`; rewrote `Dockerfile.worker` to run `tsx src/workers/index.ts` directly (fixing malformed lines + non-existent `worker:build` script + missing `dist/`); fixed `Dockerfile.dev`/`Dockerfile.worker.dev` (removed non-existent `packages/` copy + corrected script names); cursor-based "Load More" pagination on home feed (`FeedContainer` + `LoadMoreButton` client components using existing `Button` primitive); dropped deprecated `push_subscriptions.keys` column via migration `0005_neat_wolverine.sql`; added Google + GitHub OAuth providers (conditional on env vars, Credentials-only fallback preserved); created `/sign-in` and `/auth-error` pages (previously referenced in `pages.signIn`/`pages.error` but missing); added optional OAuth env vars to `env/index.ts` + `.env.example` + `src/test/setup.ts` + `.github/workflows/ci.yml` + `docker-compose.prod.yml` (**279 tests across 49 suites** + 10 E2E) |
+ 
+ ---
+ 
+@@ -1427,6 +1590,66 @@ The publisher stays alive for the process lifetime. The `flows.ts` FlowProducer
+ 
+ **Lesson**: Drizzle's query builder is deeply chainable. Mock factories must handle arbitrary chaining depth. Self-referential mocks (`result.method = method`) are the cleanest pattern for this.
+ 
++---
++
++## Phase 15: Production Readiness — Lessons Learned
++
++### 1. Dockerfile Drift — `node:22-alpine` vs `engines.node: ">=24.0.0"`
++
++**Issue**: The production Dockerfiles (`Dockerfile.web`, `Dockerfile.worker`) pinned Node 22 while `package.json` requires Node 24. Additionally, `Dockerfile.worker` had malformed lines (missing newlines), referenced a non-existent `worker:build` script, and copied a non-existent `dist/` directory.
++
++**Fix**: Pinned both Dockerfiles to `node:24-alpine`. Added `output: "standalone"` to `next.config.ts` so `Dockerfile.web` can copy the self-contained `.next/standalone/` directory. Rewrote `Dockerfile.worker` to run `tsx src/workers/index.ts` directly (since `tsx` is in `devDependencies`, the builder stage installs all deps; the runner stage copies `node_modules` + `src`).
++
++**Lesson**: Dockerfiles must be validated as part of CI — not just visually reviewed. A `docker build --check` step (or equivalent) catches malformed lines and missing scripts before they reach production. Always pin to the exact Node version specified in `engines.node`.
++
++### 2. `output: "standalone"` Required for Production Docker
++
++**Issue**: `Dockerfile.web` copied `.next/standalone/server.js` but `next.config.ts` didn't set `output: "standalone"`. The build would fail because the standalone directory wasn't generated.
++
++**Fix**: Added `output: "standalone"` to `next.config.ts`. This is the Next.js-recommended Docker pattern — it bundles only the production deps into a self-contained server.
++
++**Lesson**: `output: "standalone"` is mandatory when using the standalone Docker pattern. Without it, the Dockerfile references a directory that doesn't exist. Always pair the config flag with the Dockerfile copy step.
++
++### 3. Cursor-Based "Load More" — Server Fetch Initial, Client Fetches Subsequent
++
++**Issue**: `getFeedArticles()` already returned `{ articles, nextCursor, hasMore }` but the UI never surfaced this. The home page had a `TODO: Restore Load More with cursor pagination` comment.
++
++**Fix**: Created `FeedContainer` (client component) that receives `initialArticles` + `initialNextCursor` + `initialHasMore` from the Server Component (`FeedData`). On "Load More" click, it fetches `/api/articles?cursor=...` and appends results. Handles loading, error+retry, and "no more articles" states.
++
++**Lesson**: The Next.js 16 App Router pattern for paginated feeds is: Server Component fetches page 1 (for fast initial render + SEO), Client Component fetches subsequent pages (for interactivity). The `<Suspense>` boundary wraps the Server Component so the page shell renders immediately.
++
++### 4. Dropping a Deprecated Column — Additive Migration Verification
++
++**Issue**: The `keys` column on `push_subscriptions` was marked `@deprecated` in Phase 14 but retained for "backward compat". Phase 15 verified no code reads it (via grep) and dropped it.
++
++**Fix**: Removed `keys` from `schema.ts`, generated migration `0005_neat_wolverine.sql` (`ALTER TABLE push_subscriptions DROP COLUMN keys;`). The TDD-style verification: first removed `keys` from the test mock and confirmed tests still passed (proving no code reads it), THEN removed the column from the schema.
++
++**Lesson**: Before dropping a column, grep the entire `src/` for references. Use the test mock as a canary — if removing the column from the mock doesn't break tests, no code reads it. Always generate a Drizzle migration (`drizzle-kit generate`) rather than writing SQL by hand.
++
++### 5. OAuth Providers — Conditional Configuration for Backward Compat
++
++**Issue**: Adding Google + GitHub OAuth providers naively (always-on) would break existing deployments that don't have OAuth env vars configured — Auth.js would throw at boot.
++
++**Fix**: Extracted `buildProviders()` into a separate module (`src/lib/auth/providers.ts`) that conditionally includes Google/GitHub only when both `CLIENT_ID` and `CLIENT_SECRET` are present. The env vars are `.optional()` in the Zod schema. This preserves backward compat: deployments without OAuth continue to work with Credentials-only auth.
++
++**Lesson**: When adding new auth providers, make them conditional on env vars. The `Provider` type from Auth.js v5 is a union (object form + function form) — use `'id' in p` narrowing to access the `id` property safely in tests.
++
++### 6. Missing `/sign-in` and `/auth-error` Pages — Referenced but Non-Existent
++
++**Issue**: `src/lib/auth/index.ts` had `pages.signIn: "/sign-in"` and `pages.error: "/auth-error"`, but neither page existed. The Credentials flow was broken (no UI to trigger it).
++
++**Fix**: Created `src/app/sign-in/page.tsx` (Server Component that inspects env vars and passes `showGoogle`/`showGithub` to `SignInClient`) + `src/app/sign-in/SignInClient.tsx` (Client Component with OAuth buttons + Credentials form). Created `src/app/auth-error/page.tsx` (simple error landing). Used `<form action="/api/auth/signin/google" method="post">` for OAuth (progressive enhancement — works without client JS).
++
++**Lesson**: Always verify that routes referenced in `pages.signIn`/`pages.error` actually exist. The Auth.js config silently accepts non-existent paths — the failure only appears at runtime when a user is redirected to a 404. Server-action forms (`<form action="..." method="post">`) are the simplest OAuth trigger pattern — no `SessionProvider` or client-side `signIn()` needed.
++
++### 7. Mocking `global.fetch` in Vitest — `vi.stubGlobal` Pattern
++
++**Issue**: Tests for `FeedContainer` (which calls `fetch("/api/articles?cursor=...")`) created a `vi.fn()` mock but never assigned it to `global.fetch`, so the real `fetch` was called (which failed since no server was running).
++
++**Fix**: Used `vi.stubGlobal("fetch", mockFetch)` in `beforeEach()` to replace the global `fetch` with the mock. Reset in `beforeEach` via `mockFetch.mockReset()`.
++
++**Lesson**: `vi.fn()` creates a mock function but doesn't replace anything by itself. For global APIs like `fetch`, use `vi.stubGlobal("fetch", mockFn)` (or assign `global.fetch = mockFn as unknown as typeof fetch`). Always reset between tests to avoid cross-test contamination.
++
+ ## License
+ 
+ Proprietary. All rights reserved. See [LICENSE](./LICENSE) for details.
+diff --git a/docker-compose.prod.yml b/docker-compose.prod.yml
+index 251726d..24fc290 100644
+--- a/docker-compose.prod.yml
++++ b/docker-compose.prod.yml
+@@ -10,6 +10,21 @@ services:
+       - DATABASE_URL=postgres://postgres:postgres@postgres:5432/onestopnews
+       - REDIS_URL=redis://redis:6379
+       - NODE_ENV=production
++      # Pass through auth env vars from host (set in .env.production or shell)
++      - AUTH_SECRET=${AUTH_SECRET:-}
++      - AUTH_URL=${AUTH_URL:-}
++      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
++      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
++      - NEXT_PUBLIC_VAPID_PUBLIC_KEY=${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
++      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
++      - VAPID_SUBJECT=${VAPID_SUBJECT:-}
++      - PUSH_KEY_ENCRYPTION_KEY=${PUSH_KEY_ENCRYPTION_KEY:-}
++      - TRUSTED_PROXY=${TRUSTED_PROXY:-}
++      # OAuth providers (optional — Credentials-only auth if blank)
++      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
++      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
++      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
++      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
+     depends_on:
+       postgres:
+         condition: service_healthy
+@@ -25,6 +40,12 @@ services:
+       - DATABASE_URL=postgres://postgres:postgres@postgres:5432/onestopnews
+       - REDIS_URL=redis://redis:6379
+       - NODE_ENV=production
++      - AUTH_SECRET=${AUTH_SECRET:-}
++      - AUTH_URL=${AUTH_URL:-}
++      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
++      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
++      - PUSH_KEY_ENCRYPTION_KEY=${PUSH_KEY_ENCRYPTION_KEY:-}
++      - VAPID_SUBJECT=${VAPID_SUBJECT:-}
+     depends_on:
+       postgres:
+         condition: service_healthy
+diff --git a/drizzle/meta/_journal.json b/drizzle/meta/_journal.json
+index 16f8ab3..34c1568 100644
+--- a/drizzle/meta/_journal.json
++++ b/drizzle/meta/_journal.json
+@@ -36,6 +36,13 @@
+       "when": 1781760294316,
+       "tag": "0004_smiling_newton_destine",
+       "breakpoints": true
++    },
++    {
++      "idx": 5,
++      "version": "7",
++      "when": 1781809984820,
++      "tag": "0005_neat_wolverine",
++      "breakpoints": true
+     }
+   ]
+ }
+\ No newline at end of file
+diff --git a/next.config.ts b/next.config.ts
+index 0bb38f6..c72f0ab 100644
+--- a/next.config.ts
++++ b/next.config.ts
+@@ -10,6 +10,13 @@ import type { NextConfig } from "next";
+  * (v5.1 corrected the earlier ≥16.2.6 guidance — 16.0.7 is the actual security patch.)
+  */
+ const nextConfig: NextConfig = {
++  // ── OUTPUT MODE ─────────────────────────────────────────────────────────
++  // "standalone" produces a self-contained .next/standalone/ directory that
++  // can be deployed without node_modules (only used deps are bundled). This
++  // is the Next.js-recommended pattern for production Docker images and is
++  // required by Dockerfile.web.
++  output: "standalone",
++
+   // ── CACHE COMPONENTS ───────────────────────────────────────────────────
+   // TOP-LEVEL flag. Enables Cache Components ("use cache" directive), PPR,
+   // and opt-in caching model. Replaces ALL of: experimental.ppr + dynamicIO.
+diff --git a/src/app/(public)/page.tsx b/src/app/(public)/page.tsx
+index 1d820c2..b2d6284 100644
+--- a/src/app/(public)/page.tsx
++++ b/src/app/(public)/page.tsx
+@@ -48,8 +48,6 @@ export default function HomePage() {
+         <Suspense fallback={<FeedSkeleton />}>
+           <FeedData limit={6} />
+         </Suspense>
+-
+-        {/* TODO: Restore Load More with cursor pagination */}
+       </main>
+ 
+       {/* 6. AI Nutrition Label Demo */}
+diff --git a/src/app/api/push/subscribe/route.test.ts b/src/app/api/push/subscribe/route.test.ts
+index d2d1edb..f9b7859 100644
+--- a/src/app/api/push/subscribe/route.test.ts
++++ b/src/app/api/push/subscribe/route.test.ts
+@@ -26,7 +26,6 @@ vi.mock("@/lib/db", () => ({
+   pushSubscriptions: {
+     endpoint: "endpoint",
+     encryptedKeys: "encrypted_keys",
+-    keys: "keys",
+   },
+ }));
+ 
+diff --git a/src/features/feed/components/FeedData.tsx b/src/features/feed/components/FeedData.tsx
+index 50fdb84..1edacda 100644
+--- a/src/features/feed/components/FeedData.tsx
++++ b/src/features/feed/components/FeedData.tsx
+@@ -1,4 +1,4 @@
+-import { FeedGrid } from "./FeedGrid";
++import { FeedContainer } from "./FeedContainer";
+ import { getFeedArticles } from "@/features/feed/queries";
+ import { Footer } from "@/shared/components/layout/Footer";
+ 
+@@ -13,9 +13,12 @@ interface FeedDataProps {
+ /**
+  * FeedData — Server Component for fetching and rendering feed articles.
+  *
+- * This component fetches data and renders the FeedGrid + Footer.
+- * It is wrapped in <Suspense> by the parent to prevent blocking
+- * the page render in Next.js 16 with cacheComponents enabled.
++ * This component fetches the initial page of articles and renders the
++ * `FeedContainer` (client component) which manages cursor-based "Load More"
++ * pagination by calling `/api/articles?cursor=...` on user click.
++ *
++ * Wrapped in <Suspense> by the parent to prevent blocking the page render
++ * in Next.js 16 with cacheComponents enabled.
+  */
+ export async function FeedData({
+   category: propCategory,
+@@ -44,7 +47,11 @@ export async function FeedData({
+ 
+   return (
+     <>
+-      <FeedGrid articles={feed.articles} />
++      <FeedContainer
++        initialArticles={feed.articles}
++        initialNextCursor={feed.nextCursor}
++        initialHasMore={feed.hasMore}
++      />
+       <Footer />
+     </>
+   );
+diff --git a/src/lib/auth/index.ts b/src/lib/auth/index.ts
+index cb71d43..65764e0 100644
+--- a/src/lib/auth/index.ts
++++ b/src/lib/auth/index.ts
+@@ -1,74 +1,24 @@
+ import { DrizzleAdapter } from "@auth/drizzle-adapter";
+ import NextAuth from "next-auth";
+-import Credentials from "next-auth/providers/credentials";
+-import { eq } from "drizzle-orm";
+-import { z } from "zod";
+ 
+ import { env } from "@/lib/env";
+-import { db } from "@/lib/db";
+ import { authDb } from "@/lib/db/auth";
+ import * as schema from "@/lib/db/schema";
++import { buildProviders } from "./providers";
+ 
+ /**
+  * Auth.js v5 (beta) configuration using DrizzleAdapter.
+  * Http-only session cookies, same-site, secure in production.
++ *
++ * Providers (configured in ./providers.ts):
++ *   - Credentials  — always present (admin email/password login)
++ *   - Google       — conditional on GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET
++ *   - GitHub       — conditional on GITHUB_CLIENT_ID + GITHUB_CLIENT_SECRET
++ *
++ * OAuth providers are loaded only when their env vars are set, so existing
++ * deployments without OAuth configuration continue to work unchanged.
+  */
+ 
+-// ─── Credentials Provider (Admin Authentication) ──────────────────────────
+-// Validates email/password, authenticates user, and returns user with role
+-// ────────────────────────────────────────────────────────────────────────────
+-const credentialsProvider = Credentials({
+-  id: "credentials",
+-  name: "Credentials",
+-  credentials: {
+-    email: { label: "Email", type: "email" },
+-    password: { label: "Password", type: "password" },
+-  },
+-  async authorize(credentials) {
+-    if (!credentials) return null;
+-
+-    // Parse and validate the incoming credentials
+-    const parsed = z
+-      .object({
+-        email: z.string().email(),
+-        password: z.string().min(1),
+-      })
+-      .safeParse(credentials);
+-
+-    if (!parsed.success) return null;
+-
+-    const { email, password } = parsed.data;
+-
+-    // Query the database for the user by email
+-    const user = await db
+-      .select({
+-        id: schema.users.id,
+-        email: schema.users.email,
+-        name: schema.users.name,
+-        role: schema.users.role,
+-        passwordHash: schema.users.passwordHash,
+-      })
+-      .from(schema.users)
+-      .where(eq(schema.users.email, email))
+-      .limit(1)
+-      .then((rows) => rows[0] ?? null);
+-
+-    if (!user) return null;
+-    if (!user.passwordHash) return null;
+-
+-    const bcrypt = await import("bcryptjs");
+-    const isValid = await bcrypt.compare(password, user.passwordHash);
+-    if (!isValid) return null;
+-
+-    return {
+-      id: user.id,
+-      email: user.email,
+-      name: user.name,
+-      role: user.role,
+-    };
+-  },
+-});
+-
+ export const { handlers, auth, signIn, signOut } = NextAuth({
+   adapter: DrizzleAdapter(authDb, {
+     // NOTE: `as any` is required because the adapter's DefaultPostgres*Table types
+@@ -96,7 +46,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
+     signIn: "/sign-in",
+     error: "/auth-error",
+   },
+-  providers: [credentialsProvider],
++  providers: buildProviders(),
+   callbacks: {
+     jwt({ token, user, trigger, session }) {
+       if (user) {
+diff --git a/src/lib/db/schema.ts b/src/lib/db/schema.ts
+index 932eabb..73fefc9 100644
+--- a/src/lib/db/schema.ts
++++ b/src/lib/db/schema.ts
+@@ -194,18 +194,12 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
+   /**
+    * Encrypted push subscription keys (AES-256-GCM encrypted envelope).
+    *
+-   * Phase 14 (MEDIUM-2 fix): This column stores the entire encrypted JSON
+-   * envelope as a single string. The old `keys` column (below) stored
+-   * `{ p256dh: encryptedEnvelope, auth: "encrypted" }` which was semantically
+-   * misleading — the schema type said `{ p256dh: string; auth: string }` but
+-   * `p256dh` actually held the entire encrypted envelope for both keys.
+-   *
+-   * The `keys` column is retained for backward compatibility during the
+-   * migration transition period. It can be dropped in a future release.
++   * Stores the entire encrypted JSON envelope as a single string. The
++   * legacy `keys` column (which stored `{ p256dh: encryptedEnvelope, auth:
++   * "encrypted" }` and was semantically misleading) was dropped in migration
++   * `0005` after Phase 14 verified no code reads it.
+    */
+   encryptedKeys: text("encrypted_keys"),
+-  /** @deprecated Use `encryptedKeys` instead. Retained for backward compat. */
+-  keys: jsonb("keys").$type<{ p256dh: string; auth: string }>(),
+   userAgent: text("user_agent"),
+   createdAt: timestamp("created_at").defaultNow().notNull(),
+   isActive: boolean("is_active").default(true).notNull(),
+diff --git a/src/lib/env/index.ts b/src/lib/env/index.ts
+index e9bee97..cc034dd 100644
+--- a/src/lib/env/index.ts
++++ b/src/lib/env/index.ts
+@@ -61,6 +61,15 @@ export const envSchema = z.object({
+       "PUSH_KEY_ENCRYPTION_KEY must be 64 hex characters"
+     ),
+ 
++  // ── OAuth Providers (optional) ──────────────────────────────────────────
++  // When both CLIENT_ID and CLIENT_SECRET for a given provider are present,
++  // the provider is enabled in src/lib/auth/providers.ts. When absent, the
++  // app falls back to Credentials-only auth (backward compat).
++  GOOGLE_CLIENT_ID: z.string().optional(),
++  GOOGLE_CLIENT_SECRET: z.string().optional(),
++  GITHUB_CLIENT_ID: z.string().optional(),
++  GITHUB_CLIENT_SECRET: z.string().optional(),
++
+   // ── Node Environment ────────────────────────────────────────────────────
+   NODE_ENV: z
+     .enum(["development", "production", "test"])
+diff --git a/src/test/setup.ts b/src/test/setup.ts
+index d5d3e8f..499f457 100644
+--- a/src/test/setup.ts
++++ b/src/test/setup.ts
+@@ -24,6 +24,13 @@ process.env.VAPID_PRIVATE_KEY = "test-vapid-private-key";
+ process.env.VAPID_SUBJECT = "mailto:test@onestopnews.com";
+ process.env.PUSH_KEY_ENCRYPTION_KEY =
+   "0000000000000000000000000000000000000000000000000000000000000000";
++// OAuth env vars are optional in env/index.ts (Zod .optional()). Set dummy
++// values so tests that exercise the auth module don't trigger env validation
++// errors if the schema ever changes to require them.
++process.env.GOOGLE_CLIENT_ID = "test-google-client-id";
++process.env.GOOGLE_CLIENT_SECRET = "test-google-client-secret";
++process.env.GITHUB_CLIENT_ID = "test-github-client-id";
++process.env.GITHUB_CLIENT_SECRET = "test-github-client-secret";
+ // NODE_ENV is set by vitest to "test" — no need to set it manually.
+ // If a test needs a different NODE_ENV, use vi.stubEnv("NODE_ENV", value).
+ 

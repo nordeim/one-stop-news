@@ -1,0 +1,203 @@
+diff --git a/src/app/(public)/page.test.tsx b/src/app/(public)/page.test.tsx
+index ccf1152..d1a3a9a 100644
+--- a/src/app/(public)/page.test.tsx
++++ b/src/app/(public)/page.test.tsx
+@@ -1,7 +1,30 @@
+ import * as React from "react";
+-import { describe, it, expect, vi } from "vitest";
++import { describe, it, expect, vi, beforeEach } from "vitest";
+ import { render } from "@testing-library/react";
+ 
++// Mock window.matchMedia for RevealProvider (now rendered inside the page)
++beforeEach(() => {
++  vi.stubGlobal(
++    "matchMedia",
++    vi.fn((query: string) => ({
++      matches: false,
++      media: query,
++      onchange: null,
++      addEventListener: vi.fn(),
++      removeEventListener: vi.fn(),
++      dispatchEvent: vi.fn(),
++    }))
++  );
++  vi.stubGlobal(
++    "IntersectionObserver",
++    class MockIntersectionObserver {
++      observe = vi.fn();
++      unobserve = vi.fn();
++      disconnect = vi.fn();
++    }
++  );
++});
++
+ // Mock next-auth/react so UserMenu (rendered inside Header) doesn't throw
+ // "useSession must be wrapped in <SessionProvider>" during unit tests.
+ // In production, SessionProvider wraps the entire app in layout.tsx.
+diff --git a/src/app/(public)/page.tsx b/src/app/(public)/page.tsx
+index 1d30fed..295fdec 100644
+--- a/src/app/(public)/page.tsx
++++ b/src/app/(public)/page.tsx
+@@ -9,19 +9,20 @@ import { StatsSection } from "@/shared/components/ui/StatsSection";
+ import { NewsletterCTA } from "@/shared/components/ui/NewsletterCTA";
+ import { LeadStory } from "@/features/feed/components/LeadStory";
+ import { NutritionLabelDemo } from "@/features/summaries/components/NutritionLabelDemo";
++import { RevealProvider } from "@/shared/components/providers/RevealProvider";
+ import FaqAccordion from "@/shared/components/ui/Accordion";
+ 
+ export default function HomePage() {
+   return (
+     <div className="min-h-screen bg-paper-50">
+-      {/* Scroll Progress Indicator */}
+-      <div className="scroll-progress" aria-hidden="true" />
++      <RevealProvider>
++        {/* Scroll Progress Indicator */}
++        <div className="scroll-progress" aria-hidden="true" />
+ 
+-      {/* 1. Breaking News Ticker */}
+-      <NewsTicker />
++        <NewsTicker />
+ 
+-      {/* 2. Masthead / Wordmark */}
+-      <Masthead />
++        {/* 2. Masthead / Wordmark */}
++        <Masthead />
+ 
+       {/* 3. Header + Category Navigation */}
+       <Suspense fallback={null}>
+@@ -66,6 +67,7 @@ export default function HomePage() {
+       <Suspense fallback={null}>
+         <Footer />
+       </Suspense>
++      </RevealProvider>
+     </div>
+   );
+ }
+diff --git a/src/app/account/page.tsx b/src/app/account/page.tsx
+index a5d48b4..552c0b5 100644
+--- a/src/app/account/page.tsx
++++ b/src/app/account/page.tsx
+@@ -1,3 +1,4 @@
++import { Suspense } from "react";
+ import { verifySession } from "@/lib/auth/dal";
+ import { getLinkedProviders } from "./actions";
+ import { AccountClient } from "./AccountClient";
+@@ -8,27 +9,43 @@ import { AccountClient } from "./AccountClient";
+  * Phase 19+ remediation, Batch 3 / F2.
+  *
+  * Shows the user's currently-linked auth providers (Credentials + any OAuth)
+- * and lets them initiate linking a new OAuth provider. The actual OAuth flow
+- * still goes through Auth.js `/api/auth/signin`, but the `linkOAuthProvider`
+- * server action pre-creates the `accounts` row so the OAuth callback's
+- * `adapter.linkAccount()` succeeds instead of throwing `OAuthAccountNotLinked`.
++ * and lets them initiate linking a new OAuth provider.
+  *
+- * This page closes the gap documented in:
+- *   - src/lib/auth/index.ts:signIn() TODO
+- *   - src/app/auth-error/AuthErrorMessage.tsx "link from your account settings"
+- *
+- * Auth: requires authenticated session (verifySession redirects to /sign-in
+- * if not signed in).
++ * The page shell is synchronous; all data access (verifySession +
++ * getLinkedProviders) happens inside the Suspense-wrapped AccountData
++ * component, satisfying Next.js 16 cacheComponents requirements.
+  */
+-export default async function AccountPage() {
++
++/* ------------------------------------------------------------------ */
++/* Skeleton (rendered by Suspense while AccountData fetches)          */
++/* ------------------------------------------------------------------ */
++function AccountSkeleton() {
++  return (
++    <main id="main-content" className="min-h-screen bg-paper-50 text-ink-600 font-ui">
++      <div className="mx-auto max-w-2xl px-6 py-12">
++        <div className="mb-8 border-b border-ink-100 pb-6 animate-pulse">
++          <div className="h-3 w-16 bg-ink-200 rounded mb-4" />
++          <div className="h-9 w-64 bg-ink-200 rounded mb-2" />
++          <div className="h-4 w-48 bg-ink-100 rounded mt-2" />
++        </div>
++        <div className="space-y-4">
++          <div className="h-16 bg-ink-100 rounded" />
++          <div className="h-16 bg-ink-100 rounded" />
++        </div>
++      </div>
++    </main>
++  );
++}
++
++/* ------------------------------------------------------------------ */
++/* Async data component (Server Component)                             */
++/* ------------------------------------------------------------------ */
++async function AccountData() {
+   const { user } = await verifySession();
+   const linkedProviders = await getLinkedProviders();
+ 
+   return (
+-    <main
+-      id="main-content"
+-      className="min-h-screen bg-paper-50 text-ink-600 font-ui"
+-    >
++    <main id="main-content" className="min-h-screen bg-paper-50 text-ink-600 font-ui">
+       <div className="mx-auto max-w-2xl px-6 py-12">
+         <header className="mb-8 border-b border-ink-100 pb-6">
+           <p className="font-mono text-[10px] uppercase tracking-widest text-ink-300">
+@@ -50,3 +67,14 @@ export default async function AccountPage() {
+     </main>
+   );
+ }
++
++/* ------------------------------------------------------------------ */
++/* Page shell (synchronous — delegates data fetch to AccountData)      */
++/* ------------------------------------------------------------------ */
++export default function AccountPage() {
++  return (
++    <Suspense fallback={<AccountSkeleton />}>
++      <AccountData />
++    </Suspense>
++  );
++}
+diff --git a/src/app/layout.test.tsx b/src/app/layout.test.tsx
+index 5fd6062..e29587f 100644
+--- a/src/app/layout.test.tsx
++++ b/src/app/layout.test.tsx
+@@ -17,14 +17,6 @@ import * as React from "react";
+ import { describe, it, expect, vi } from "vitest";
+ import { render, screen } from "@testing-library/react";
+ 
+-// Mock RevealProvider to avoid IntersectionObserver setup in test env.
+-// The provider's children are rendered as-is; we only care about the
+-// skip link which is a sibling of <RevealProvider> in the layout.
+-vi.mock("@/shared/components/providers/RevealProvider", () => ({
+-  RevealProvider: ({ children }: { children: React.ReactNode }) =>
+-    React.createElement(React.Fragment, null, children),
+-}));
+-
+ // Mock globals.css import (layout.tsx imports "./globals.css")
+ vi.mock("./globals.css", () => ({}));
+ 
+diff --git a/src/app/layout.tsx b/src/app/layout.tsx
+index 81c97ac..c8d5cb2 100644
+--- a/src/app/layout.tsx
++++ b/src/app/layout.tsx
+@@ -2,7 +2,6 @@ import type { Metadata } from "next";
+ import { Newsreader, Instrument_Sans } from "next/font/google";
+ import localFont from "next/font/local";
+ import { SessionProvider } from "next-auth/react";
+-import { RevealProvider } from "@/shared/components/providers/RevealProvider";
+ import "./globals.css";
+ 
+ const newsreader = Newsreader({
+@@ -59,12 +58,7 @@ export default function RootLayout({
+         >
+           Skip to content
+         </a>
+-        <RevealProvider>
+-          {/* Phase 19 (H2): SessionProvider enables useSession() in client
+-              components like <UserMenu> in the Header. Required for the
+-              sign-in/sign-out button to work. */}
+-          <SessionProvider>{children}</SessionProvider>
+-        </RevealProvider>
++        <SessionProvider>{children}</SessionProvider>
+       </body>
+     </html>
+   );

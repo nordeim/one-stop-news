@@ -1,0 +1,1514 @@
+$ cd /home/project/onestopnews && ls -la packages/ 2>&1; echo "---"; grep -E '"(worker|worker:|build|dev)' package.json 2>&1; echo "---"; ls Dockerfile* 2>&1; echo "---"; cat .dockerignore 2>&1 | head -20
+ls: cannot access 'packages/': No such file or directory
+---
+    "build": "next build",
+    "dev": "next dev --turbo",
+    "worker": "tsx src/workers/index.ts"
+  "devDependencies": {
+---
+Dockerfile.dev
+Dockerfile.sample.dev
+Dockerfile.web
+Dockerfile.worker
+Dockerfile.worker.dev
+---
+# Dependencies
+node_modules
+.pnpm-store
+.next
+
+# Build outputs
+dist
+build
+.cache
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Environment files (except the template)
+.env
+.env.*
+!.env.docker
+$ cd /home/project/onestopnews && ls src/app/api/auth/ src/lib/db/ 2>&1; echo "---"; cat src/lib/db/auth.ts 2>&1; echo "---"; cat types/next-auth.d.ts 2>&1
+src/app/api/auth/:
+[[...nextauth]]
+
+src/lib/db/:
+auth.ts
+index.test.ts
+index.ts
+schema.ts
+seed.test.ts
+seed.ts
+---
+/**
+ * auth.ts — Dedicated Drizzle instance for Auth.js adapter.
+ *
+ * The main `db` proxy (in index.ts) defers connection until first query,
+ * but `@auth/drizzle-adapter` requires a real drizzle instance at init time.
+ * This file creates an eager instance for the adapter only.
+ */
+
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import * as schema from "./schema";
+
+const url = process.env.DATABASE_URL;
+
+if (!url) {
+  throw new Error(
+    "[DB] DATABASE_URL is not set. Auth.js DrizzleAdapter cannot initialize."
+  );
+}
+
+const client = postgres(url, {
+  max: process.env.NODE_ENV === "production" ? 10 : 3,
+  idle_timeout: 20,
+  connect_timeout: 10,
+});
+
+/** Real Drizzle instance for Auth.js adapter (NOT a Proxy). */
+export const authDb = drizzle(client, {
+  schema,
+  logger: process.env.NODE_ENV === "development",
+});
+---
+import { DefaultSession } from "next-auth";
+import "next-auth/jwt";
+
+/**
+ * Module augmentation for NextAuth.js (Auth.js v5 beta)
+ *
+ * Extends the default Session and JWT types to include
+ * our custom `id` and `role` fields.
+ *
+ * IMPORTANT: Merge custom properties with `DefaultSession["user"]`
+ * to preserve the default fields (name, email, image).
+ */
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id: string;
+      role: "reader" | "admin";
+    } & DefaultSession["user"];
+  }
+
+  interface User {
+    role: "reader" | "admin";
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    id?: string;
+    role?: "reader" | "admin";
+  }
+}
+$ cd /home/project/onestopnews && ls src/app/api/auth/\[\[...nextauth\]\]/ 2>&1; echo "---"; cat src/app/api/auth/\[\[...nextauth\]\]/route.ts 2>&1; echo "---"; ls src/app/sign-in/ src/app/auth-error/ 2>&1
+Command failed with exit_code=2, duration_ms=51.
+route.ts
+---
+import { handlers } from "@/lib/auth";
+
+/**
+ * Auth.js v5 API route handlers.
+ *
+ * NextAuth creates GET / POST handlers at this catch-all route.
+ * - GET  /api/auth/session      → returns current session (or null)
+ * - POST /api/auth/callback/*   → OAuth / credential flow callbacks
+ */
+export const { GET, POST } = handlers;
+---
+ls: cannot access 'src/app/sign-in/': No such file or directory
+ls: cannot access 'src/app/auth-error/': No such file or directory
+$ cd /home/project/onestopnews && find src -name "*sign*" -o -name "*auth-error*" -o -name "*signin*" 2>&1; echo "---"; grep -rn "signIn\|sign-in" src/app/ src/shared/ 2>&1 | head -20; echo "---"; grep -rn "Google\|GitHub" src/ 2>&1 | head -20
+---
+src/app/api/admin/route.ts:8: * - Redirects unauthenticated users to `/sign-in`
+---
+$ cd /home/project/onestopnews && cat src/app/api/admin/route.ts 2>&1; echo "---"; grep -rn "provider\|signIn" src/lib/auth/ 2>&1; echo "---"; cat .env.example 2>&1 | head -40
+import { NextResponse } from "next/server";
+import { verifyAdminSession } from "@/lib/auth/dal";
+
+/**
+ * Admin API Route — Stub for Phase 4
+ *
+ * Uses DAL-layer `verifyAdminSession()` which:
+ * - Redirects unauthenticated users to `/sign-in`
+ * - Redirects non-admin users to `/`
+ * - Only proceeds if the user has role === "admin"
+ *
+ * TODO: Replace stub with actual admin endpoints in Phase 4.
+ */
+export async function GET() {
+  const user = await verifyAdminSession();
+
+  return NextResponse.json({
+    status: "ok",
+    message: "Admin API — stub endpoint for Phase 4",
+    user: {
+      id: user.id,
+      name: user.name,
+      role: user.role,
+    },
+  });
+}
+---
+src/lib/auth/index.ts:3:import Credentials from "next-auth/providers/credentials";
+src/lib/auth/index.ts:72:export const { handlers, auth, signIn, signOut } = NextAuth({
+src/lib/auth/index.ts:96:    signIn: "/sign-in",
+src/lib/auth/index.ts:99:  providers: [credentialsProvider],
+---
+# OneStopNews Development Environment Variables
+# Override any value by creating a `.env` file (ignored by git) or setting shell variables.
+
+# ----------------------------------------------------------------------
+# Database
+# ----------------------------------------------------------------------
+DATABASE_URL=postgresql://onestopnews:${DB_PASSWORD:-onestopnews_dev_password}@localhost:5432/onestopnews_dev
+
+# ----------------------------------------------------------------------
+# Redis (BullMQ)
+# ----------------------------------------------------------------------
+REDIS_URL=redis://localhost:6379
+
+# ----------------------------------------------------------------------
+# Auth.js (NextAuth v5)
+# ----------------------------------------------------------------------
+AUTH_SECRET=dev-secret-do-not-use-in-production
+AUTH_URL=http://localhost:3000
+
+# ----------------------------------------------------------------------
+# AI Providers (dummy keys for development – replace when testing real APIs)
+# ----------------------------------------------------------------------
+ANTHROPIC_API_KEY=sk-ant-your_key
+OPENAI_API_KEY=sk-your_key
+
+# ----------------------------------------------------------------------
+# Push Notifications (VAPID keys – generate with `npx web-push generate-vapid-keys`)
+# ----------------------------------------------------------------------
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=generate_and_replace
+VAPID_PRIVATE_KEY=generate_and_replace
+VAPID_SUBJECT=mailto:dev@onestopnews.com
+
+# ----------------------------------------------------------------------
+# Push Key Encryption (AES-256-GCM, 64 hex chars – dummy for dev)
+# ----------------------------------------------------------------------
+PUSH_KEY_ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000000
+
+# ----------------------------------------------------------------------
+# Node Environment
+# ----------------------------------------------------------------------
+$ cd /home/project/onestopnews && cat .env.example 2>&1 | tail -30; echo "---"; cat src/lib/db/seed.ts 2>&1 | head -80
+REDIS_URL=redis://localhost:6379
+
+# ----------------------------------------------------------------------
+# Auth.js (NextAuth v5)
+# ----------------------------------------------------------------------
+AUTH_SECRET=dev-secret-do-not-use-in-production
+AUTH_URL=http://localhost:3000
+
+# ----------------------------------------------------------------------
+# AI Providers (dummy keys for development – replace when testing real APIs)
+# ----------------------------------------------------------------------
+ANTHROPIC_API_KEY=sk-ant-your_key
+OPENAI_API_KEY=sk-your_key
+
+# ----------------------------------------------------------------------
+# Push Notifications (VAPID keys – generate with `npx web-push generate-vapid-keys`)
+# ----------------------------------------------------------------------
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=generate_and_replace
+VAPID_PRIVATE_KEY=generate_and_replace
+VAPID_SUBJECT=mailto:dev@onestopnews.com
+
+# ----------------------------------------------------------------------
+# Push Key Encryption (AES-256-GCM, 64 hex chars – dummy for dev)
+# ----------------------------------------------------------------------
+PUSH_KEY_ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000000
+
+# ----------------------------------------------------------------------
+# Node Environment
+# ----------------------------------------------------------------------
+NODE_ENV=development
+---
+/**
+ * Database Seed Script
+ *
+ * Populates the database with realistic dummy data for development and testing.
+ * Run with: pnpm db:seed
+ */
+
+import { db } from "./index";
+import { categories, sources, articles, summaries } from "./schema";
+
+// ─── Categories ───────────────────────────────────────────────────────────
+export const seedCategories = [
+  { slug: "top-stories", name: "Top Stories", description: "The most important stories" },
+  { slug: "local", name: "Local", description: "News from your local area" },
+  { slug: "tech", name: "Tech", description: "Technology and digital innovation" },
+  { slug: "global", name: "Global", description: "International news" },
+  { slug: "finance", name: "Finance", description: "Markets and economy" },
+  { slug: "politics", name: "Politics", description: "Domestic and international politics" },
+  { slug: "culture", name: "Culture", description: "Arts and entertainment" },
+];
+
+// ─── Sources ───────────────────────────────────────────────────────────────
+export const seedSources = [
+  { name: "Reuters", url: "https://reuters.com", feedUrl: "https://reuters.com/feed", feedFormat: "rss" as const, priority: 1 },
+  { name: "AP News", url: "https://apnews.com", feedUrl: "https://apnews.com/feed", feedFormat: "rss" as const, priority: 1 },
+  { name: "Bloomberg", url: "https://bloomberg.com", feedUrl: "https://bloomberg.com/feed", feedFormat: "rss" as const, priority: 2 },
+  { name: "The Verge", url: "https://theverge.com", feedUrl: "https://theverge.com/feed", feedFormat: "rss" as const, priority: 2 },
+  { name: "Straits Times", url: "https://straitstimes.com", feedUrl: "https://straitstimes.com/feed", feedFormat: "rss" as const, priority: 3 },
+  { name: "CNA", url: "https://channelnewsasia.com", feedUrl: "https://channelnewsasia.com/feed", feedFormat: "rss" as const, priority: 3 },
+  { name: "TechCrunch", url: "https://techcrunch.com", feedUrl: "https://techcrunch.com/feed", feedFormat: "rss" as const, priority: 2 },
+];
+
+// ─── Articles (30) ─────────────────────────────────────────────────────────
+export const seedArticles: Array<{
+  title: string;
+  excerpt: string;
+  canonicalUrl: string;
+  contentHash: string;
+  contentAvailability:
+    | "title_only"
+    | "excerpt"
+    | "partial_text"
+    | "full_text";
+  importanceScore: number;
+  hasSummary: boolean;
+  publishedAt: Date;
+  categorySlug: string;
+  sourceUrl: string;
+}> = [
+  { title: "Global Markets Rally as G7 Inflation Cools for Third Straight Month", excerpt: "Benchmark indices across major economies posted gains after synchronized inflation data suggested central banks may have room to ease monetary policy in Q3.", canonicalUrl: "https://onestop.news/article/1", contentHash: "hash001", contentAvailability: "full_text", importanceScore: 0.95, hasSummary: true, publishedAt: new Date("2026-06-10T13:30:00"), categorySlug: "top-stories", sourceUrl: "https://bloomberg.com" },
+  { title: "EU Parliament Votes on AI Act Enforcement Framework", excerpt: "The European Parliament has voted to establish a comprehensive enforcement framework for the AI Act, with 142 in favor and 37 against.", canonicalUrl: "https://onestop.news/article/2", contentHash: "hash002", contentAvailability: "full_text", importanceScore: 0.92, hasSummary: true, publishedAt: new Date("2026-06-10T12:00:00"), categorySlug: "top-stories", sourceUrl: "https://reuters.com" },
+  { title: "SpaceX Starship Completes First Orbital Refueling Test", excerpt: "The historic mission marks a critical milestone for lunar and Mars ambitions.", canonicalUrl: "https://onestop.news/article/3", contentHash: "hash003", contentAvailability: "partial_text", importanceScore: 0.88, hasSummary: true, publishedAt: new Date("2026-06-10T11:30:00"), categorySlug: "top-stories", sourceUrl: "https://apnews.com" },
+  { title: "Apple Unveils On-Device AI Framework With App Store Integration", excerpt: "The new framework allows third-party apps to tap into Apple Intelligence models running locally on iPhone and Mac.", canonicalUrl: "https://onestop.news/article/4", contentHash: "hash004", contentAvailability: "full_text", importanceScore: 0.85, hasSummary: true, publishedAt: new Date("2026-06-10T10:45:00"), categorySlug: "top-stories", sourceUrl: "https://theverge.com" },
+  { title: "WHO Declares New Mpox Variant a Public Health Emergency", excerpt: "The designation unlocks emergency funding and coordinated response mechanisms as cases spread across Central Africa.", canonicalUrl: "https://onestop.news/article/5", contentHash: "hash005", contentAvailability: "full_text", importanceScore: 0.87, hasSummary: true, publishedAt: new Date("2026-06-10T09:15:00"), categorySlug: "top-stories", sourceUrl: "https://reuters.com" },
+  { title: "Japan Central Bank Signals End to Negative Interest Rate Era", excerpt: "The historic shift comes as inflation stabilizes above 2% for 15 consecutive months.", canonicalUrl: "https://onestop.news/article/6", contentHash: "hash006", contentAvailability: "partial_text", importanceScore: 0.83, hasSummary: false, publishedAt: new Date("2026-06-10T08:30:00"), categorySlug: "top-stories", sourceUrl: "https://apnews.com" },
+  { title: "Singapore MRT Cross Island Line Phase 2 Alignment Confirmed", excerpt: "The Land Transport Authority has confirmed the final alignment for Phase 2 of the Cross Island Line.", canonicalUrl: "https://onestop.news/article/7", contentHash: "hash007", contentAvailability: "excerpt", importanceScore: 0.65, hasSummary: false, publishedAt: new Date("2026-06-09T17:00:00"), categorySlug: "local", sourceUrl: "https://straitstimes.com" },
+  { title: "GE2025 Campaign Enters Final Week With Housing Policy as Key Battleground", excerpt: "Candidates sharpen their positions on public housing supply and affordability.", canonicalUrl: "https://onestop.news/article/8", contentHash: "hash008", contentAvailability: "full_text", importanceScore: 0.91, hasSummary: true, publishedAt: new Date("2026-06-09T14:00:00"), categorySlug: "politics", sourceUrl: "https://channelnewsasia.com" },
+  { title: "China Announces $40B Semiconductor Subsidy Package Amid Export Controls", excerpt: "The state-backed investment targets legacy chip manufacturing and advanced packaging.", canonicalUrl: "https://onestop.news/article/9", contentHash: "hash009", contentAvailability: "full_text", importanceScore: 0.89, hasSummary: true, publishedAt: new Date("2026-06-09T11:30:00"), categorySlug: "tech", sourceUrl: "https://reuters.com" },
+  { title: "Major K-pop Agency Launches AI Artist Management Division", excerpt: "The move signals a broader industry shift toward virtual performers.", canonicalUrl: "https://onestop.news/article/10", contentHash: "hash010", contentAvailability: "partial_text", importanceScore: 0.72, hasSummary: false, publishedAt: new Date("2026-06-09T09:00:00"), categorySlug: "culture", sourceUrl: "https://theverge.com" },
+  { title: "Global Chip Shortage Eases as Supply Chain Normalizes", excerpt: "Automotive and consumer electronics manufacturers report stabilizing component availability after two years of constraints.", canonicalUrl: "https://onestop.news/article/11", contentHash: "hash011", contentAvailability: "full_text", importanceScore: 0.84, hasSummary: true, publishedAt: new Date("2026-06-08T16:00:00"), categorySlug: "tech", sourceUrl: "https://techcrunch.com" },
+  { title: "Singapore Budget 2026: GST Rate Hike to 9% Confirmed", excerpt: "The government confirmed the final phase of the GST increase will proceed as planned in 2026.", canonicalUrl: "https://onestop.news/article/12", contentHash: "hash012", contentAvailability: "excerpt", importanceScore: 0.78, hasSummary: false, publishedAt: new Date("2026-06-08T10:00:00"), categorySlug: "local", sourceUrl: "https://straitstimes.com" },
+  { title: "UN Climate Panel Warns of Irreversible Tipping Points", excerpt: "The latest IPCC report identifies five critical tipping points that could trigger cascading climate effects within decades.", canonicalUrl: "https://onestop.news/article/13", contentHash: "hash013", contentAvailability: "full_text", importanceScore: 0.9, hasSummary: true, publishedAt: new Date("2026-06-07T14:30:00"), categorySlug: "global", sourceUrl: "https://reuters.com" },
+  { title: "Meta's New AR Glasses Replace Smartphones by 2028", excerpt: "Mark Zuckerberg claims the device will make smartphones obsolete within three years.", canonicalUrl: "https://onestop.news/article/14", contentHash: "hash014", contentAvailability: "partial_text", importanceScore: 0.81, hasSummary: false, publishedAt: new Date("2026-06-07T09:00:00"), categorySlug: "tech", sourceUrl: "https://theverge.com" },
+  { title: "Oil Prices Surge After Middle East Tensions Escalate", excerpt: "Brent crude jumps 8% as shipping routes face disruption in the Strait of Hormuz.", canonicalUrl: "https://onestop.news/article/15", contentHash: "hash015", contentAvailability: "full_text", importanceScore: 0.86, hasSummary: true, publishedAt: new Date("2026-06-06T12:00:00"), categorySlug: "finance", sourceUrl: "https://bloomberg.com" },
+  { title: "New COVID-19 Variant Detected in Southeast Asia", excerpt: "Health authorities in Malaysia and Thailand report cases of a new variant with increased transmissibility.", canonicalUrl: "https://onestop.news/article/16", contentHash: "hash016", contentAvailability: "full_text", importanceScore: 0.88, hasSummary: true, publishedAt: new Date("2026-06-06T08:00:00"), categorySlug: "global", sourceUrl: "https://apnews.com" },
+  { title: "Singapore's Changi Airport Retains World's Best Airport Title", excerpt: "The airport scores top marks for dining, retail, and operational efficiency.", canonicalUrl: "https://onestop.news/article/17", contentHash: "hash017", contentAvailability: "excerpt", importanceScore: 0.7, hasSummary: false, publishedAt: new Date("2026-06-05T16:00:00"), categorySlug: "local", sourceUrl: "https://channelnewsasia.com" },
+  { title: "Tesla Reveals Next-Gen Battery Tech with 50% Range Boost", excerpt: "The silicon anode batteries promise 1,000km range on a single charge starting from 2027.", canonicalUrl: "https://onestop.news/article/18", contentHash: "hash018", contentAvailability: "full_text", importanceScore: 0.82, hasSummary: true, publishedAt: new Date("2026-06-05T10:00:00"), categorySlug: "tech", sourceUrl: "https://techcrunch.com" },
+  { title: "ASEAN Summit Reaches Landmark Trade Agreement", excerpt: "The 10-nation bloc agrees on a unified digital trade framework that will eliminate cross-border data tariffs.", canonicalUrl: "https://onestop.news/article/19", contentHash: "hash019", contentAvailability: "full_text", importanceScore: 0.87, hasSummary: true, publishedAt: new Date("2026-06-04T14:00:00"), categorySlug: "global", sourceUrl: "https://reuters.com" },
+  { title: "Global Semiconductor Investment Hits $100B in 2026", excerpt: "Governments and companies worldwide pour record funding into chip manufacturing capacity.", canonicalUrl: "https://onestop.news/article/20", contentHash: "hash020", contentAvailability: "partial_text", importanceScore: 0.79, hasSummary: false, publishedAt: new Date("2026-06-04T09:00:00"), categorySlug: "finance", sourceUrl: "https://bloomberg.com" },
+  { title: "Singapore Launches National AI Strategy 2.0", excerpt: "The updated strategy focuses on developing AI talent and infrastructure to position the city-state as a global AI hub.", canonicalUrl: "https://onestop.news/article/21", contentHash: "hash021", contentAvailability: "full_text", importanceScore: 0.8, hasSummary: true, publishedAt: new Date("2026-06-03T16:00:00"), categorySlug: "local", sourceUrl: "https://channelnewsasia.com" },
+  { title: "Netflix Reports Record Subscriber Growth in Q2", excerpt: "The streaming giant added 8.5 million subscribers, beating analyst expectations by 2 million.", canonicalUrl: "https://onestop.news/article/22", contentHash: "hash022", contentAvailability: "full_text", importanceScore: 0.75, hasSummary: true, publishedAt: new Date("2026-06-03T10:00:00"), categorySlug: "culture", sourceUrl: "https://bloomberg.com" },
+  { title: "US Federal Reserve Holds Rates Steady at 5.25%", excerpt: "The Fed signals potential rate cuts later in the year as inflation shows signs of stabilization.", canonicalUrl: "https://onestop.news/article/23", contentHash: "hash023", contentAvailability: "full_text", importanceScore: 0.86, hasSummary: true, publishedAt: new Date("2026-06-02T14:00:00"), categorySlug: "finance", sourceUrl: "https://reuters.com" },
+  { title: "Open Source AI Model Surpasses GPT-4 on Benchmarks", excerpt: "A community-developed model achieves state-of-the-art results on multiple reasoning benchmarks.", canonicalUrl: "https://onestop.news/article/24", contentHash: "hash024", contentAvailability: "partial_text", importanceScore: 0.78, hasSummary: false, publishedAt: new Date("2026-06-02T09:00:00"), categorySlug: "tech", sourceUrl: "https://techcrunch.com" },
+  { title: "Singapore Food Festival Draws Record Crowds", excerpt: "", canonicalUrl: "https://onestop.news/article/25", contentHash: "hash025", contentAvailability: "title_only", importanceScore: 0.6, hasSummary: false, publishedAt: new Date("2026-06-01T16:00:00"), categorySlug: "local", sourceUrl: "https://straitstimes.com" },
+  { title: "European Elections See Surge in Youth Voter Turnout", excerpt: "Turnout among voters aged 18-30 reached a record 62%, reshaping the political landscape.", canonicalUrl: "https://onestop.news/article/26", contentHash: "hash026", contentAvailability: "full_text", importanceScore: 0.81, hasSummary: true, publishedAt: new Date("2026-06-01T10:00:00"), categorySlug: "politics", sourceUrl: "https://reuters.com" },
+  { title: "Quantum Computing Breakthrough Achieved at MIT", excerpt: "Researchers demonstrate a 1000-qubit processor with error correction, a major step toward practical quantum computers.", canonicalUrl: "https://onestop.news/article/27", contentHash: "hash027", contentAvailability: "full_text", importanceScore: 0.84, hasSummary: true, publishedAt: new Date("2026-05-31T14:00:00"), categorySlug: "tech", sourceUrl: "https://apnews.com" },
+  { title: "Global Art Market Reaches $65B in 2026", excerpt: "Digital art and NFTs drive growth as traditional galleries adapt to new technologies.", canonicalUrl: "https://onestop.news/article/28", contentHash: "hash028", contentAvailability: "partial_text", importanceScore: 0.71, hasSummary: false, publishedAt: new Date("2026-05-31T09:00:00"), categorySlug: "culture", sourceUrl: "https://bloomberg.com" },
+  { title: "Singapore Hospitals Adopt AI Diagnostic Tools", excerpt: "Three major hospitals deploy AI-powered imaging systems to improve early detection of critical conditions.", canonicalUrl: "https://onestop.news/article/29", contentHash: "hash029", contentAvailability: "full_text", importanceScore: 0.77, hasSummary: true, publishedAt: new Date("2026-05-30T14:00:00"), categorySlug: "local", sourceUrl: "https://channelnewsasia.com" },
+  { title: "Cyberattack on Major Payment Processor Affects Millions", excerpt: "A sophisticated attack on a leading payment processor exposes data from 30 million customers.", canonicalUrl: "https://onestop.news/article/30", contentHash: "hash030", contentAvailability: "full_text", importanceScore: 0.9, hasSummary: true, publishedAt: new Date("2026-05-30T10:00:00"), categorySlug: "tech", sourceUrl: "https://reuters.com" },
+];
+$ cd /home/project/onestopnews && cat drizzle/meta/_journal.json 2>&1; echo "---"; ls drizzle/ 2>&1
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1781173999219,
+      "tag": "0000_purple_blue_marvel",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1781412179926,
+      "tag": "0001_panoramic_makkari",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781412402462,
+      "tag": "0002_flippant_screwball",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1781745098302,
+      "tag": "0003_strong_mac_gargan",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1781760294316,
+      "tag": "0004_smiling_newton_destine",
+      "breakpoints": true
+    }
+  ]
+}---
+0000_purple_blue_marvel.sql
+0001_panoramic_makkari.sql
+0002_flippant_screwball.sql
+0003_strong_mac_gargan.sql
+0004_smiling_newton_destine.sql
+custom-indexes.sql
+meta
+$ cd /home/project/onestopnews && cat src/features/feed/queries.test.ts 2>&1 | head -80; echo "---"; cat src/features/feed/components/ArticleCard.tsx 2>&1 | grep -n "^\"use client\"\|^import" | head -5
+import { describe, it, expect } from "vitest";
+import { getFeedArticles } from "./queries";
+
+describe("getFeedArticles", () => {
+  it("is exported as a function", () => {
+    expect(typeof getFeedArticles).toBe("function");
+  });
+
+  it("returns a FeedPage shape when called", async () => {
+    // This test validates the function signature and return shape.
+    // Note: actual DB integration requires DATABASE_URL to be set AND the
+    // Next.js runtime (cacheComponents: true enables "use cache" + cacheLife,
+    // which are only available inside the Next.js server runtime, not vitest).
+    // In vitest, calling getFeedArticles() throws because cacheLife() is not
+    // available outside Next.js — that's expected and acceptable here.
+    try {
+      const result = await getFeedArticles();
+      expect(result).toHaveProperty("articles");
+      expect(result).toHaveProperty("nextCursor");
+      expect(result).toHaveProperty("hasMore");
+      expect(Array.isArray(result.articles)).toBe(true);
+    } catch (error) {
+      // Acceptable error conditions in vitest (without Next.js runtime):
+      //   1. "DATABASE_URL is not set" — DB not available
+      //   2. "cacheLife() is only available with the cacheComponents config"
+      //      — "use cache" directive not supported outside Next.js runtime
+      const message = error instanceof Error ? error.message : String(error);
+      if (
+        message.includes("DATABASE_URL") ||
+        message.includes("cacheComponents") ||
+        message.includes("cacheLife")
+      ) {
+        // Expected — test environment doesn't have full Next.js runtime
+        expect(message.length).toBeGreaterThan(0);
+      } else {
+        throw error;
+      }
+    }
+  });
+});
+---
+1:"use client";
+3:import Link from "next/link";
+4:import { formatTimeAgo } from "@/shared/lib/utils";
+5:import type { ArticleWithSource } from "@/domain/articles/types";
+
+$ cd /home/project/onestopnews && ls -la packages/ 2>&1; echo "---"; grep -E '"(worker|worker:|build|dev)' package.json 2>&1; echo "---"; ls Dockerfile* 2>&1; echo "---"; cat .dockerignore 2>&1 | head -20
+ls: cannot access 'packages/': No such file or directory
+---
+    "build": "next build",
+    "dev": "next dev --turbo",
+    "worker": "tsx src/workers/index.ts"
+  "devDependencies": {
+---
+Dockerfile.dev
+Dockerfile.sample.dev
+Dockerfile.web
+Dockerfile.worker
+Dockerfile.worker.dev
+---
+# Dependencies
+node_modules
+.pnpm-store
+.next
+
+# Build outputs
+dist
+build
+.cache
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Environment files (except the template)
+.env
+.env.*
+!.env.docker
+$ cd /home/project/onestopnews && ls src/app/api/auth/ src/lib/db/ 2>&1; echo "---"; cat src/lib/db/auth.ts 2>&1; echo "---"; cat types/next-auth.d.ts 2>&1
+src/app/api/auth/:
+[[...nextauth]]
+
+src/lib/db/:
+auth.ts
+index.test.ts
+index.ts
+schema.ts
+seed.test.ts
+seed.ts
+---
+/**
+ * auth.ts — Dedicated Drizzle instance for Auth.js adapter.
+ *
+ * The main `db` proxy (in index.ts) defers connection until first query,
+ * but `@auth/drizzle-adapter` requires a real drizzle instance at init time.
+ * This file creates an eager instance for the adapter only.
+ */
+
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import * as schema from "./schema";
+
+const url = process.env.DATABASE_URL;
+
+if (!url) {
+  throw new Error(
+    "[DB] DATABASE_URL is not set. Auth.js DrizzleAdapter cannot initialize."
+  );
+}
+
+const client = postgres(url, {
+  max: process.env.NODE_ENV === "production" ? 10 : 3,
+  idle_timeout: 20,
+  connect_timeout: 10,
+});
+
+/** Real Drizzle instance for Auth.js adapter (NOT a Proxy). */
+export const authDb = drizzle(client, {
+  schema,
+  logger: process.env.NODE_ENV === "development",
+});
+---
+import { DefaultSession } from "next-auth";
+import "next-auth/jwt";
+
+/**
+ * Module augmentation for NextAuth.js (Auth.js v5 beta)
+ *
+ * Extends the default Session and JWT types to include
+ * our custom `id` and `role` fields.
+ *
+ * IMPORTANT: Merge custom properties with `DefaultSession["user"]`
+ * to preserve the default fields (name, email, image).
+ */
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id: string;
+      role: "reader" | "admin";
+    } & DefaultSession["user"];
+  }
+
+  interface User {
+    role: "reader" | "admin";
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    id?: string;
+    role?: "reader" | "admin";
+  }
+}
+$ cd /home/project/onestopnews && ls src/app/api/auth/\[\[...nextauth\]\]/ 2>&1; echo "---"; cat src/app/api/auth/\[\[...nextauth\]\]/route.ts 2>&1; echo "---"; ls src/app/sign-in/ src/app/auth-error/ 2>&1
+Command failed with exit_code=2, duration_ms=51.
+route.ts
+---
+import { handlers } from "@/lib/auth";
+
+/**
+ * Auth.js v5 API route handlers.
+ *
+ * NextAuth creates GET / POST handlers at this catch-all route.
+ * - GET  /api/auth/session      → returns current session (or null)
+ * - POST /api/auth/callback/*   → OAuth / credential flow callbacks
+ */
+export const { GET, POST } = handlers;
+---
+ls: cannot access 'src/app/sign-in/': No such file or directory
+ls: cannot access 'src/app/auth-error/': No such file or directory
+$ cd /home/project/onestopnews && find src -name "*sign*" -o -name "*auth-error*" -o -name "*signin*" 2>&1; echo "---"; grep -rn "signIn\|sign-in" src/app/ src/shared/ 2>&1 | head -20; echo "---"; grep -rn "Google\|GitHub" src/ 2>&1 | head -20
+---
+src/app/api/admin/route.ts:8: * - Redirects unauthenticated users to `/sign-in`
+---
+$ cd /home/project/onestopnews && cat src/app/api/admin/route.ts 2>&1; echo "---"; grep -rn "provider\|signIn" src/lib/auth/ 2>&1; echo "---"; cat .env.example 2>&1 | head -40
+import { NextResponse } from "next/server";
+import { verifyAdminSession } from "@/lib/auth/dal";
+
+/**
+ * Admin API Route — Stub for Phase 4
+ *
+ * Uses DAL-layer `verifyAdminSession()` which:
+ * - Redirects unauthenticated users to `/sign-in`
+ * - Redirects non-admin users to `/`
+ * - Only proceeds if the user has role === "admin"
+ *
+ * TODO: Replace stub with actual admin endpoints in Phase 4.
+ */
+export async function GET() {
+  const user = await verifyAdminSession();
+
+  return NextResponse.json({
+    status: "ok",
+    message: "Admin API — stub endpoint for Phase 4",
+    user: {
+      id: user.id,
+      name: user.name,
+      role: user.role,
+    },
+  });
+}
+---
+src/lib/auth/index.ts:3:import Credentials from "next-auth/providers/credentials";
+src/lib/auth/index.ts:72:export const { handlers, auth, signIn, signOut } = NextAuth({
+src/lib/auth/index.ts:96:    signIn: "/sign-in",
+src/lib/auth/index.ts:99:  providers: [credentialsProvider],
+---
+# OneStopNews Development Environment Variables
+# Override any value by creating a `.env` file (ignored by git) or setting shell variables.
+
+# ----------------------------------------------------------------------
+# Database
+# ----------------------------------------------------------------------
+DATABASE_URL=postgresql://onestopnews:${DB_PASSWORD:-onestopnews_dev_password}@localhost:5432/onestopnews_dev
+
+# ----------------------------------------------------------------------
+# Redis (BullMQ)
+# ----------------------------------------------------------------------
+REDIS_URL=redis://localhost:6379
+
+# ----------------------------------------------------------------------
+# Auth.js (NextAuth v5)
+# ----------------------------------------------------------------------
+AUTH_SECRET=dev-secret-do-not-use-in-production
+AUTH_URL=http://localhost:3000
+
+# ----------------------------------------------------------------------
+# AI Providers (dummy keys for development – replace when testing real APIs)
+# ----------------------------------------------------------------------
+ANTHROPIC_API_KEY=sk-ant-your_key
+OPENAI_API_KEY=sk-your_key
+
+# ----------------------------------------------------------------------
+# Push Notifications (VAPID keys – generate with `npx web-push generate-vapid-keys`)
+# ----------------------------------------------------------------------
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=generate_and_replace
+VAPID_PRIVATE_KEY=generate_and_replace
+VAPID_SUBJECT=mailto:dev@onestopnews.com
+
+# ----------------------------------------------------------------------
+# Push Key Encryption (AES-256-GCM, 64 hex chars – dummy for dev)
+# ----------------------------------------------------------------------
+PUSH_KEY_ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000000
+
+# ----------------------------------------------------------------------
+# Node Environment
+# ----------------------------------------------------------------------
+$ cd /home/project/onestopnews && cat .env.example 2>&1 | tail -30; echo "---"; cat src/lib/db/seed.ts 2>&1 | head -80
+REDIS_URL=redis://localhost:6379
+
+# ----------------------------------------------------------------------
+# Auth.js (NextAuth v5)
+# ----------------------------------------------------------------------
+AUTH_SECRET=dev-secret-do-not-use-in-production
+AUTH_URL=http://localhost:3000
+
+# ----------------------------------------------------------------------
+# AI Providers (dummy keys for development – replace when testing real APIs)
+# ----------------------------------------------------------------------
+ANTHROPIC_API_KEY=sk-ant-your_key
+OPENAI_API_KEY=sk-your_key
+
+# ----------------------------------------------------------------------
+# Push Notifications (VAPID keys – generate with `npx web-push generate-vapid-keys`)
+# ----------------------------------------------------------------------
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=generate_and_replace
+VAPID_PRIVATE_KEY=generate_and_replace
+VAPID_SUBJECT=mailto:dev@onestopnews.com
+
+# ----------------------------------------------------------------------
+# Push Key Encryption (AES-256-GCM, 64 hex chars – dummy for dev)
+# ----------------------------------------------------------------------
+PUSH_KEY_ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000000
+
+# ----------------------------------------------------------------------
+# Node Environment
+# ----------------------------------------------------------------------
+NODE_ENV=development
+---
+/**
+ * Database Seed Script
+ *
+ * Populates the database with realistic dummy data for development and testing.
+ * Run with: pnpm db:seed
+ */
+
+import { db } from "./index";
+import { categories, sources, articles, summaries } from "./schema";
+
+// ─── Categories ───────────────────────────────────────────────────────────
+export const seedCategories = [
+  { slug: "top-stories", name: "Top Stories", description: "The most important stories" },
+  { slug: "local", name: "Local", description: "News from your local area" },
+  { slug: "tech", name: "Tech", description: "Technology and digital innovation" },
+  { slug: "global", name: "Global", description: "International news" },
+  { slug: "finance", name: "Finance", description: "Markets and economy" },
+  { slug: "politics", name: "Politics", description: "Domestic and international politics" },
+  { slug: "culture", name: "Culture", description: "Arts and entertainment" },
+];
+
+// ─── Sources ───────────────────────────────────────────────────────────────
+export const seedSources = [
+  { name: "Reuters", url: "https://reuters.com", feedUrl: "https://reuters.com/feed", feedFormat: "rss" as const, priority: 1 },
+  { name: "AP News", url: "https://apnews.com", feedUrl: "https://apnews.com/feed", feedFormat: "rss" as const, priority: 1 },
+  { name: "Bloomberg", url: "https://bloomberg.com", feedUrl: "https://bloomberg.com/feed", feedFormat: "rss" as const, priority: 2 },
+  { name: "The Verge", url: "https://theverge.com", feedUrl: "https://theverge.com/feed", feedFormat: "rss" as const, priority: 2 },
+  { name: "Straits Times", url: "https://straitstimes.com", feedUrl: "https://straitstimes.com/feed", feedFormat: "rss" as const, priority: 3 },
+  { name: "CNA", url: "https://channelnewsasia.com", feedUrl: "https://channelnewsasia.com/feed", feedFormat: "rss" as const, priority: 3 },
+  { name: "TechCrunch", url: "https://techcrunch.com", feedUrl: "https://techcrunch.com/feed", feedFormat: "rss" as const, priority: 2 },
+];
+
+// ─── Articles (30) ─────────────────────────────────────────────────────────
+export const seedArticles: Array<{
+  title: string;
+  excerpt: string;
+  canonicalUrl: string;
+  contentHash: string;
+  contentAvailability:
+    | "title_only"
+    | "excerpt"
+    | "partial_text"
+    | "full_text";
+  importanceScore: number;
+  hasSummary: boolean;
+  publishedAt: Date;
+  categorySlug: string;
+  sourceUrl: string;
+}> = [
+  { title: "Global Markets Rally as G7 Inflation Cools for Third Straight Month", excerpt: "Benchmark indices across major economies posted gains after synchronized inflation data suggested central banks may have room to ease monetary policy in Q3.", canonicalUrl: "https://onestop.news/article/1", contentHash: "hash001", contentAvailability: "full_text", importanceScore: 0.95, hasSummary: true, publishedAt: new Date("2026-06-10T13:30:00"), categorySlug: "top-stories", sourceUrl: "https://bloomberg.com" },
+  { title: "EU Parliament Votes on AI Act Enforcement Framework", excerpt: "The European Parliament has voted to establish a comprehensive enforcement framework for the AI Act, with 142 in favor and 37 against.", canonicalUrl: "https://onestop.news/article/2", contentHash: "hash002", contentAvailability: "full_text", importanceScore: 0.92, hasSummary: true, publishedAt: new Date("2026-06-10T12:00:00"), categorySlug: "top-stories", sourceUrl: "https://reuters.com" },
+  { title: "SpaceX Starship Completes First Orbital Refueling Test", excerpt: "The historic mission marks a critical milestone for lunar and Mars ambitions.", canonicalUrl: "https://onestop.news/article/3", contentHash: "hash003", contentAvailability: "partial_text", importanceScore: 0.88, hasSummary: true, publishedAt: new Date("2026-06-10T11:30:00"), categorySlug: "top-stories", sourceUrl: "https://apnews.com" },
+  { title: "Apple Unveils On-Device AI Framework With App Store Integration", excerpt: "The new framework allows third-party apps to tap into Apple Intelligence models running locally on iPhone and Mac.", canonicalUrl: "https://onestop.news/article/4", contentHash: "hash004", contentAvailability: "full_text", importanceScore: 0.85, hasSummary: true, publishedAt: new Date("2026-06-10T10:45:00"), categorySlug: "top-stories", sourceUrl: "https://theverge.com" },
+  { title: "WHO Declares New Mpox Variant a Public Health Emergency", excerpt: "The designation unlocks emergency funding and coordinated response mechanisms as cases spread across Central Africa.", canonicalUrl: "https://onestop.news/article/5", contentHash: "hash005", contentAvailability: "full_text", importanceScore: 0.87, hasSummary: true, publishedAt: new Date("2026-06-10T09:15:00"), categorySlug: "top-stories", sourceUrl: "https://reuters.com" },
+  { title: "Japan Central Bank Signals End to Negative Interest Rate Era", excerpt: "The historic shift comes as inflation stabilizes above 2% for 15 consecutive months.", canonicalUrl: "https://onestop.news/article/6", contentHash: "hash006", contentAvailability: "partial_text", importanceScore: 0.83, hasSummary: false, publishedAt: new Date("2026-06-10T08:30:00"), categorySlug: "top-stories", sourceUrl: "https://apnews.com" },
+  { title: "Singapore MRT Cross Island Line Phase 2 Alignment Confirmed", excerpt: "The Land Transport Authority has confirmed the final alignment for Phase 2 of the Cross Island Line.", canonicalUrl: "https://onestop.news/article/7", contentHash: "hash007", contentAvailability: "excerpt", importanceScore: 0.65, hasSummary: false, publishedAt: new Date("2026-06-09T17:00:00"), categorySlug: "local", sourceUrl: "https://straitstimes.com" },
+  { title: "GE2025 Campaign Enters Final Week With Housing Policy as Key Battleground", excerpt: "Candidates sharpen their positions on public housing supply and affordability.", canonicalUrl: "https://onestop.news/article/8", contentHash: "hash008", contentAvailability: "full_text", importanceScore: 0.91, hasSummary: true, publishedAt: new Date("2026-06-09T14:00:00"), categorySlug: "politics", sourceUrl: "https://channelnewsasia.com" },
+  { title: "China Announces $40B Semiconductor Subsidy Package Amid Export Controls", excerpt: "The state-backed investment targets legacy chip manufacturing and advanced packaging.", canonicalUrl: "https://onestop.news/article/9", contentHash: "hash009", contentAvailability: "full_text", importanceScore: 0.89, hasSummary: true, publishedAt: new Date("2026-06-09T11:30:00"), categorySlug: "tech", sourceUrl: "https://reuters.com" },
+  { title: "Major K-pop Agency Launches AI Artist Management Division", excerpt: "The move signals a broader industry shift toward virtual performers.", canonicalUrl: "https://onestop.news/article/10", contentHash: "hash010", contentAvailability: "partial_text", importanceScore: 0.72, hasSummary: false, publishedAt: new Date("2026-06-09T09:00:00"), categorySlug: "culture", sourceUrl: "https://theverge.com" },
+  { title: "Global Chip Shortage Eases as Supply Chain Normalizes", excerpt: "Automotive and consumer electronics manufacturers report stabilizing component availability after two years of constraints.", canonicalUrl: "https://onestop.news/article/11", contentHash: "hash011", contentAvailability: "full_text", importanceScore: 0.84, hasSummary: true, publishedAt: new Date("2026-06-08T16:00:00"), categorySlug: "tech", sourceUrl: "https://techcrunch.com" },
+  { title: "Singapore Budget 2026: GST Rate Hike to 9% Confirmed", excerpt: "The government confirmed the final phase of the GST increase will proceed as planned in 2026.", canonicalUrl: "https://onestop.news/article/12", contentHash: "hash012", contentAvailability: "excerpt", importanceScore: 0.78, hasSummary: false, publishedAt: new Date("2026-06-08T10:00:00"), categorySlug: "local", sourceUrl: "https://straitstimes.com" },
+  { title: "UN Climate Panel Warns of Irreversible Tipping Points", excerpt: "The latest IPCC report identifies five critical tipping points that could trigger cascading climate effects within decades.", canonicalUrl: "https://onestop.news/article/13", contentHash: "hash013", contentAvailability: "full_text", importanceScore: 0.9, hasSummary: true, publishedAt: new Date("2026-06-07T14:30:00"), categorySlug: "global", sourceUrl: "https://reuters.com" },
+  { title: "Meta's New AR Glasses Replace Smartphones by 2028", excerpt: "Mark Zuckerberg claims the device will make smartphones obsolete within three years.", canonicalUrl: "https://onestop.news/article/14", contentHash: "hash014", contentAvailability: "partial_text", importanceScore: 0.81, hasSummary: false, publishedAt: new Date("2026-06-07T09:00:00"), categorySlug: "tech", sourceUrl: "https://theverge.com" },
+  { title: "Oil Prices Surge After Middle East Tensions Escalate", excerpt: "Brent crude jumps 8% as shipping routes face disruption in the Strait of Hormuz.", canonicalUrl: "https://onestop.news/article/15", contentHash: "hash015", contentAvailability: "full_text", importanceScore: 0.86, hasSummary: true, publishedAt: new Date("2026-06-06T12:00:00"), categorySlug: "finance", sourceUrl: "https://bloomberg.com" },
+  { title: "New COVID-19 Variant Detected in Southeast Asia", excerpt: "Health authorities in Malaysia and Thailand report cases of a new variant with increased transmissibility.", canonicalUrl: "https://onestop.news/article/16", contentHash: "hash016", contentAvailability: "full_text", importanceScore: 0.88, hasSummary: true, publishedAt: new Date("2026-06-06T08:00:00"), categorySlug: "global", sourceUrl: "https://apnews.com" },
+  { title: "Singapore's Changi Airport Retains World's Best Airport Title", excerpt: "The airport scores top marks for dining, retail, and operational efficiency.", canonicalUrl: "https://onestop.news/article/17", contentHash: "hash017", contentAvailability: "excerpt", importanceScore: 0.7, hasSummary: false, publishedAt: new Date("2026-06-05T16:00:00"), categorySlug: "local", sourceUrl: "https://channelnewsasia.com" },
+  { title: "Tesla Reveals Next-Gen Battery Tech with 50% Range Boost", excerpt: "The silicon anode batteries promise 1,000km range on a single charge starting from 2027.", canonicalUrl: "https://onestop.news/article/18", contentHash: "hash018", contentAvailability: "full_text", importanceScore: 0.82, hasSummary: true, publishedAt: new Date("2026-06-05T10:00:00"), categorySlug: "tech", sourceUrl: "https://techcrunch.com" },
+  { title: "ASEAN Summit Reaches Landmark Trade Agreement", excerpt: "The 10-nation bloc agrees on a unified digital trade framework that will eliminate cross-border data tariffs.", canonicalUrl: "https://onestop.news/article/19", contentHash: "hash019", contentAvailability: "full_text", importanceScore: 0.87, hasSummary: true, publishedAt: new Date("2026-06-04T14:00:00"), categorySlug: "global", sourceUrl: "https://reuters.com" },
+  { title: "Global Semiconductor Investment Hits $100B in 2026", excerpt: "Governments and companies worldwide pour record funding into chip manufacturing capacity.", canonicalUrl: "https://onestop.news/article/20", contentHash: "hash020", contentAvailability: "partial_text", importanceScore: 0.79, hasSummary: false, publishedAt: new Date("2026-06-04T09:00:00"), categorySlug: "finance", sourceUrl: "https://bloomberg.com" },
+  { title: "Singapore Launches National AI Strategy 2.0", excerpt: "The updated strategy focuses on developing AI talent and infrastructure to position the city-state as a global AI hub.", canonicalUrl: "https://onestop.news/article/21", contentHash: "hash021", contentAvailability: "full_text", importanceScore: 0.8, hasSummary: true, publishedAt: new Date("2026-06-03T16:00:00"), categorySlug: "local", sourceUrl: "https://channelnewsasia.com" },
+  { title: "Netflix Reports Record Subscriber Growth in Q2", excerpt: "The streaming giant added 8.5 million subscribers, beating analyst expectations by 2 million.", canonicalUrl: "https://onestop.news/article/22", contentHash: "hash022", contentAvailability: "full_text", importanceScore: 0.75, hasSummary: true, publishedAt: new Date("2026-06-03T10:00:00"), categorySlug: "culture", sourceUrl: "https://bloomberg.com" },
+  { title: "US Federal Reserve Holds Rates Steady at 5.25%", excerpt: "The Fed signals potential rate cuts later in the year as inflation shows signs of stabilization.", canonicalUrl: "https://onestop.news/article/23", contentHash: "hash023", contentAvailability: "full_text", importanceScore: 0.86, hasSummary: true, publishedAt: new Date("2026-06-02T14:00:00"), categorySlug: "finance", sourceUrl: "https://reuters.com" },
+  { title: "Open Source AI Model Surpasses GPT-4 on Benchmarks", excerpt: "A community-developed model achieves state-of-the-art results on multiple reasoning benchmarks.", canonicalUrl: "https://onestop.news/article/24", contentHash: "hash024", contentAvailability: "partial_text", importanceScore: 0.78, hasSummary: false, publishedAt: new Date("2026-06-02T09:00:00"), categorySlug: "tech", sourceUrl: "https://techcrunch.com" },
+  { title: "Singapore Food Festival Draws Record Crowds", excerpt: "", canonicalUrl: "https://onestop.news/article/25", contentHash: "hash025", contentAvailability: "title_only", importanceScore: 0.6, hasSummary: false, publishedAt: new Date("2026-06-01T16:00:00"), categorySlug: "local", sourceUrl: "https://straitstimes.com" },
+  { title: "European Elections See Surge in Youth Voter Turnout", excerpt: "Turnout among voters aged 18-30 reached a record 62%, reshaping the political landscape.", canonicalUrl: "https://onestop.news/article/26", contentHash: "hash026", contentAvailability: "full_text", importanceScore: 0.81, hasSummary: true, publishedAt: new Date("2026-06-01T10:00:00"), categorySlug: "politics", sourceUrl: "https://reuters.com" },
+  { title: "Quantum Computing Breakthrough Achieved at MIT", excerpt: "Researchers demonstrate a 1000-qubit processor with error correction, a major step toward practical quantum computers.", canonicalUrl: "https://onestop.news/article/27", contentHash: "hash027", contentAvailability: "full_text", importanceScore: 0.84, hasSummary: true, publishedAt: new Date("2026-05-31T14:00:00"), categorySlug: "tech", sourceUrl: "https://apnews.com" },
+  { title: "Global Art Market Reaches $65B in 2026", excerpt: "Digital art and NFTs drive growth as traditional galleries adapt to new technologies.", canonicalUrl: "https://onestop.news/article/28", contentHash: "hash028", contentAvailability: "partial_text", importanceScore: 0.71, hasSummary: false, publishedAt: new Date("2026-05-31T09:00:00"), categorySlug: "culture", sourceUrl: "https://bloomberg.com" },
+  { title: "Singapore Hospitals Adopt AI Diagnostic Tools", excerpt: "Three major hospitals deploy AI-powered imaging systems to improve early detection of critical conditions.", canonicalUrl: "https://onestop.news/article/29", contentHash: "hash029", contentAvailability: "full_text", importanceScore: 0.77, hasSummary: true, publishedAt: new Date("2026-05-30T14:00:00"), categorySlug: "local", sourceUrl: "https://channelnewsasia.com" },
+  { title: "Cyberattack on Major Payment Processor Affects Millions", excerpt: "A sophisticated attack on a leading payment processor exposes data from 30 million customers.", canonicalUrl: "https://onestop.news/article/30", contentHash: "hash030", contentAvailability: "full_text", importanceScore: 0.9, hasSummary: true, publishedAt: new Date("2026-05-30T10:00:00"), categorySlug: "tech", sourceUrl: "https://reuters.com" },
+];
+$ cd /home/project/onestopnews && cat drizzle/meta/_journal.json 2>&1; echo "---"; ls drizzle/ 2>&1
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1781173999219,
+      "tag": "0000_purple_blue_marvel",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1781412179926,
+      "tag": "0001_panoramic_makkari",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781412402462,
+      "tag": "0002_flippant_screwball",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1781745098302,
+      "tag": "0003_strong_mac_gargan",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1781760294316,
+      "tag": "0004_smiling_newton_destine",
+      "breakpoints": true
+    }
+  ]
+}---
+0000_purple_blue_marvel.sql
+0001_panoramic_makkari.sql
+0002_flippant_screwball.sql
+0003_strong_mac_gargan.sql
+0004_smiling_newton_destine.sql
+custom-indexes.sql
+meta
+$ cd /home/project/onestopnews && cat src/features/feed/queries.test.ts 2>&1 | head -80; echo "---"; cat src/features/feed/components/ArticleCard.tsx 2>&1 | grep -n "^\"use client\"\|^import" | head -5
+import { describe, it, expect } from "vitest";
+import { getFeedArticles } from "./queries";
+
+describe("getFeedArticles", () => {
+  it("is exported as a function", () => {
+    expect(typeof getFeedArticles).toBe("function");
+  });
+
+  it("returns a FeedPage shape when called", async () => {
+    // This test validates the function signature and return shape.
+    // Note: actual DB integration requires DATABASE_URL to be set AND the
+    // Next.js runtime (cacheComponents: true enables "use cache" + cacheLife,
+    // which are only available inside the Next.js server runtime, not vitest).
+    // In vitest, calling getFeedArticles() throws because cacheLife() is not
+    // available outside Next.js — that's expected and acceptable here.
+    try {
+      const result = await getFeedArticles();
+      expect(result).toHaveProperty("articles");
+      expect(result).toHaveProperty("nextCursor");
+      expect(result).toHaveProperty("hasMore");
+      expect(Array.isArray(result.articles)).toBe(true);
+    } catch (error) {
+      // Acceptable error conditions in vitest (without Next.js runtime):
+      //   1. "DATABASE_URL is not set" — DB not available
+      //   2. "cacheLife() is only available with the cacheComponents config"
+      //      — "use cache" directive not supported outside Next.js runtime
+      const message = error instanceof Error ? error.message : String(error);
+      if (
+        message.includes("DATABASE_URL") ||
+        message.includes("cacheComponents") ||
+        message.includes("cacheLife")
+      ) {
+        // Expected — test environment doesn't have full Next.js runtime
+        expect(message.length).toBeGreaterThan(0);
+      } else {
+        throw error;
+      }
+    }
+  });
+});
+---
+1:"use client";
+3:import Link from "next/link";
+4:import { formatTimeAgo } from "@/shared/lib/utils";
+5:import type { ArticleWithSource } from "@/domain/articles/types";
+$ cd /home/project/onestopnews && cat src/shared/components/ui/Button.tsx 2>&1
+import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "@/shared/lib/utils";
+
+/**
+ * Button — Anti-generic, editorially-informed action primitive.
+ * Uses Radix Slot for `asChild` polymorphism and cva for variant discipline.
+ *
+ * PRD §4.1–4.2: "Editorial Dispatch" design system.
+ * PAD §5.5: Design System Reference — dispatch-ember accent, focus ring.
+ */
+
+const buttonVariants = cva(
+  /* Base styles — shared across all variants */
+  "inline-flex items-center justify-center gap-2 rounded-sm font-ui font-medium text-sm transition-all duration-150 ease-out " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dispatch-ember focus-visible:ring-offset-2 focus-visible:ring-offset-paper-50 " +
+  "disabled:pointer-events-none disabled:opacity-50",
+  {
+    variants: {
+      variant: {
+        /* Primary — dispatch-ember; the main CTA */
+        primary:
+          "bg-dispatch-ember text-paper-50 hover:bg-dispatch-ember/90 active:scale-[0.98]",
+        /* Secondary — ink on paper; lower emphasis */
+        secondary:
+          "bg-ink-900 text-paper-50 hover:bg-ink-700 active:scale-[0.98]",
+        /* Outline — bordered ghost */
+        outline:
+          "border border-ink-100 bg-transparent text-ink-900 hover:bg-paper-100 hover:border-ink-300 active:scale-[0.99]",
+        /* Ghost — no border, minimal */
+        ghost:
+          "bg-transparent text-ink-600 hover:bg-paper-100 hover:text-ink-900",
+        /* Destructive — for dangerous actions */
+        destructive:
+          "bg-red-600 text-paper-50 hover:bg-red-700 active:scale-[0.98]",
+      },
+      size: {
+        sm: "h-8 px-3 text-xs",
+        md: "h-10 px-4 text-sm",
+        lg: "h-12 px-6 text-base",
+        icon: "h-10 w-10 p-2",
+      },
+    },
+    defaultVariants: {
+      variant: "primary",
+      size: "md",
+    },
+  }
+);
+
+/* ─── Spinner Sub-component ─────────────────────────────────────────────── */
+function ButtonSpinner({ className }: { className?: string }) {
+  return (
+    <svg
+      className={cn("animate-spin h-4 w-4", className)}
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+      />
+    </svg>
+  );
+}
+
+/* ─── Component Interface ─────────────────────────────────────────────── */
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
+  asChild?: boolean;
+  isLoading?: boolean;
+}
+
+/* ─── Component ───────────────────────────────────────────────────────── */
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  (
+    {
+      className,
+      variant,
+      size,
+      asChild = false,
+      isLoading = false,
+      disabled,
+      children,
+      ...props
+    },
+    ref
+  ) => {
+    const Comp = asChild ? Slot : "button";
+
+    return (
+      <Comp
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref as React.Ref<HTMLButtonElement>}
+        disabled={disabled || isLoading}
+        {...props}
+      >
+        {isLoading && <ButtonSpinner />}
+        {children}
+      </Comp>
+    );
+  }
+);
+Button.displayName = "Button";
+
+export { Button, buttonVariants };
+$ cd /home/project/onestopnews && grep -rn "use cache\|cacheLife" src/features/feed/queries.ts 2>&1; echo "---"; grep -rn "fetch\|/api/articles" src/features/ 2>&1 | head -10; echo "---"; grep -rn "signIn\|signOut" src/ 2>&1 | head -10
+10:import { cacheLife } from "next/cache";
+35: * NOTE: Uses "use cache" to prevent blocking-route errors in Next.js 16.
+38:  "use cache";
+39:  cacheLife("feed");
+---
+src/features/feed/components/FeedData.tsx:14: * FeedData — Server Component for fetching and rendering feed articles.
+src/features/feed/components/FeedData.tsx:16: * This component fetches data and renders the FeedGrid + Footer.
+src/features/sources/components/SourcesData.tsx:2: * SourcesData.tsx — Server Component for fetching source list.
+src/features/sources/components/SourcesData.tsx:4: * Separates data fetching from the page to enable <Suspense> wrapping
+---
+src/lib/auth/index.ts:72:export const { handlers, auth, signIn, signOut } = NextAuth({
+src/lib/auth/index.ts:96:    signIn: "/sign-in",
+$ cd /home/project/onestopnews && grep -rn "encryptedKeys\|keys:" src/ 2>&1 | grep -v ".test." | head -10; echo "---"; cat drizzle/meta/_journal.json 2>&1 | grep tag | tail -3
+src/lib/security/encrypt.ts:22:export function encryptPushKeys(keys: { p256dh: string; auth: string }): string {
+src/lib/db/schema.ts:206:  encryptedKeys: text("encrypted_keys"),
+src/lib/db/schema.ts:207:  /** @deprecated Use `encryptedKeys` instead. Retained for backward compat. */
+src/lib/db/schema.ts:208:  keys: jsonb("keys").$type<{ p256dh: string; auth: string }>(),
+src/app/api/push/subscribe/route.ts:24:  keys: z.object({
+src/app/api/push/subscribe/route.ts:62:    const encryptedKeys = encryptPushKeys(keys);
+src/app/api/push/subscribe/route.ts:66:    // `encryptedKeys` column instead of stuffing it into `keys.p256dh`.
+src/app/api/push/subscribe/route.ts:73:        encryptedKeys,
+src/app/api/push/subscribe/route.ts:78:          encryptedKeys,
+---
+      "tag": "0002_flippant_screwball",
+      "tag": "0003_strong_mac_gargan",
+      "tag": "0004_smiling_newton_destine",
+$ cd /home/project/onestopnews && which docker 2>&1; echo "---"; for f in Dockerfile.web Dockerfile.worker Dockerfile.dev Dockerfile.worker.dev; do echo "=== $f ==="; head -3 "$f"; done 2>&1
+---
+=== Dockerfile.web ===
+# Stage 1: Builder
+# Pin to Node 24 LTS to match package.json engines.node ">=24.0.0".
+FROM node:24-alpine AS builder
+=== Dockerfile.worker ===
+# Stage 1: Builder — install ALL deps (tsx is in devDependencies, needed at runtime)
+FROM node:24-alpine AS builder
+WORKDIR /app
+=== Dockerfile.dev ===
+# syntax=docker.io/docker/dockerfile:1.7-labs
+# Stage 1: Base – install dependencies
+FROM node:24-alpine AS base
+=== Dockerfile.worker.dev ===
+# syntax=docker.io/docker/dockerfile:1.7-labs
+FROM node:24-alpine AS base
+$ cd /home/project/onestopnews && npx tsc --noEmit 2>&1 | tail -10; echo "EXIT: $?"
+EXIT: 0
+$ cd /home/project/onestopnews && npx vitest run src/features/feed/components/LoadMoreButton.test.tsx 2>&1 | tail -25
+Error: Failed to resolve import "./LoadMoreButton" from "src/features/feed/components/LoadMoreButton.test.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: /home/project/onestopnews/src/features/feed/components/LoadMoreButton.test.tsx:4:31
+  2  |  import { describe, it, expect, vi } from "vitest";
+  3  |  import { render, screen, fireEvent } from "@testing-library/react";
+  4  |  import { LoadMoreButton } from "./LoadMoreButton";
+     |                                  ^
+  5  |  var _jsxFileName = "/home/project/onestopnews/src/features/feed/components/LoadMoreButton.test.tsx";
+  6  |  import { jsxDEV as _jsxDEV } from "react/jsx-dev-runtime";
+ ❯ TransformPluginContext._formatLog node_modules/vitest/node_modules/vite/dist/node/chunks/node.js:30602:39
+ ❯ TransformPluginContext.error node_modules/vitest/node_modules/vite/dist/node/chunks/node.js:30599:14
+ ❯ normalizeUrl node_modules/vitest/node_modules/vite/dist/node/chunks/node.js:27842:18
+ ❯ node_modules/vitest/node_modules/vite/dist/node/chunks/node.js:27905:30
+ ❯ TransformPluginContext.transform node_modules/vitest/node_modules/vite/dist/node/chunks/node.js:27873:4
+ ❯ EnvironmentPluginContainer.transform node_modules/vitest/node_modules/vite/dist/node/chunks/node.js:30387:14
+ ❯ loadAndTransform node_modules/vitest/node_modules/vite/dist/node/chunks/node.js:24646:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  19:07:56
+   Duration  629ms (transform 16ms, setup 25ms, import 0ms, tests 0ms, environment 440ms)
+$ cd /home/project/onestopnews && npx vitest run src/features/feed/components/LoadMoreButton.test.tsx 2>&1 | tail -20
+
+ RUN  v4.1.9 /home/project/onestopnews
+
+stdout | src/features/feed/components/LoadMoreButton.test.tsx
+Test suite starting...
+
+stdout | src/features/feed/components/LoadMoreButton.test.tsx
+Test suite complete.
+
+ ✓ src/features/feed/components/LoadMoreButton.test.tsx (5 tests) 137ms
+
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+   Start at  19:09:00
+   Duration  793ms (transform 41ms, setup 26ms, import 93ms, tests 137ms, environment 433ms)
+$ cd /home/project/onestopnews && npx vitest run src/features/feed/components/FeedContainer.test.tsx 2>&1 | tail -25
+Error: Failed to resolve import "./FeedContainer" from "src/features/feed/components/FeedContainer.test.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: /home/project/onestopnews/src/features/feed/components/FeedContainer.test.tsx:4:30
+  2  |  import { describe, it, expect, vi, beforeEach } from "vitest";
+  3  |  import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+  4  |  import { FeedContainer } from "./FeedContainer";
+     |                                 ^
+  5  |  var _jsxFileName = "/home/project/onestopnews/src/features/feed/components/FeedContainer.test.tsx";
+  6  |  import { jsxDEV as _jsxDEV } from "react/jsx-dev-runtime";
+ ❯ TransformPluginContext._formatLog node_modules/vitest/node_modules/vite/dist/node/chunks/node.js:30602:39
+ ❯ TransformPluginContext.error node_modules/vitest/node_modules/vite/dist/node/chunks/node.js:30599:14
+ ❯ normalizeUrl node_modules/vitest/node_modules/vite/dist/node/chunks/node.js:27842:18
+ ❯ node_modules/vitest/node_modules/vite/dist/node/chunks/node.js:27905:30
+ ❯ TransformPluginContext.transform node_modules/vitest/node_modules/vite/dist/node/chunks/node.js:27873:4
+ ❯ EnvironmentPluginContainer.transform node_modules/vitest/node_modules/vite/dist/node/chunks/node.js:30387:14
+ ❯ loadAndTransform node_modules/vitest/node_modules/vite/dist/node/chunks/node.js:24646:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  19:10:00
+   Duration  630ms (transform 18ms, setup 26ms, import 0ms, tests 0ms, environment 447ms)
+$ cd /home/project/onestopnews && npx vitest run src/features/feed/components/FeedContainer.test.tsx 2>&1 | tail -30
+        >
+          Failed to load more articles
+        </p>
+        <button
+          aria-label="Retry loading articles"
+          class="inline-flex items-center justify-center gap-2 rounded-sm font-ui font-medium transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dispatch-ember focus-visible:ring-offset-2 focus-visible:ring-offset-paper-50 disabled:pointer-events-none disabled:opacity-50 border border-ink-100 bg-transparent text-ink-900 hover:bg-paper-100 hover:border-ink-300 active:scale-[0.99] h-10 px-4 text-sm"
+        >
+          Retry
+        </button>
+      </div>
+    </div>
+  </body>
+</html>
+ ❯ waitForWrapper node_modules/@testing-library/dom/dist/wait-for.js:163:27
+ ❯ src/features/feed/components/FeedContainer.test.tsx:228:11
+    226|
+    227|     fireEvent.click(screen.getByRole("button", { name: /retry/i }));
+    228|     await waitFor(() => {
+       |           ^
+    229|       expect(screen.getByText("Third Article")).toBeDefined();
+    230|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 5 passed (8)
+   Start at  19:10:44
+   Duration  3.88s (transform 59ms, setup 24ms, import 126ms, tests 3.19s, environment 439ms)
+$ cd /home/project/onestopnews && npx vitest run src/features/feed/components/FeedContainer.test.tsx 2>&1 | grep -E "FAIL|✗|✓|×|failed|passed" | head -20
+ ❯ src/features/feed/components/FeedContainer.test.tsx (8 tests | 3 failed) 3185ms
+     ✓ renders initial articles passed from the server 31ms
+     ✓ does not render Load More button when initialHasMore is false 6ms
+     ✓ renders Load More button when initialHasMore is true 77ms
+     × fetches next page and appends articles on Load More click 1018ms
+     × hides Load More button after fetching the last page 1010ms
+     ✓ shows loading state during fetch 9ms
+     ✓ shows error retry UI when fetch fails 12ms
+     × retries fetch when Retry button is clicked after error 1018ms
+ FAIL  src/features/feed/components/FeedContainer.test.tsx > FeedContainer > fetches next page and appends articles on Load More click
+ FAIL  src/features/feed/components/FeedContainer.test.tsx > FeedContainer > hides Load More button after fetching the last page
+ FAIL  src/features/feed/components/FeedContainer.test.tsx > FeedContainer > retries fetch when Retry button is clicked after error
+ Test Files  1 failed (1)
+      Tests  3 failed | 5 passed (8)
+$ cd /home/project/onestopnews && npx vitest run src/features/feed/components/FeedContainer.test.tsx 2>&1 | grep -A 20 "fetches next page and appends" | head -40
+     × fetches next page and appends articles on Load More click 1018ms
+     × hides Load More button after fetching the last page 1010ms
+     ✓ shows loading state during fetch 9ms
+     ✓ shows error retry UI when fetch fails 13ms
+     × retries fetch when Retry button is clicked after error 1015ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/features/feed/components/FeedContainer.test.tsx > FeedContainer > fetches next page and appends articles on Load More click
+TestingLibraryElementError: Unable to find an element with the text: Third Article. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <div
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+▲ Next.js 16.2.9 (Turbopack)
+- Environments: .env.local, .env
+- Cache Components enabled
+- Experiments (use with caution):
+  ✓ viewTransition
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 7.1s
+  Running TypeScript ...
+  Finished TypeScript in 4.3s ...
+  Collecting page data using 3 workers ...
+Error: Environment variable validation failed:
+  - DATABASE_URL: DATABASE_URL must start with postgres:// or postgresql://
+
+Please check your .env file and ensure all required variables are set.
+    at <unknown> (src/lib/env/index.ts:102:11)
+    at module evaluation (src/lib/env/index.ts:105:21)
+    at module evaluation (src/app/api/push/subscribe/route.ts:2:1)
+
+> Build error occurred
+Error: Failed to collect page data for /api/push/subscribe
+    at ignore-listed frames {
+  type: 'Error'
+}
+BUILD EXIT: 0
+$ cd /home/project/onestopnews && DATABASE_URL="postgres://dummy:dummy@localhost:5432/dummy" \ REDIS_URL="redis://localhost:6379" \ AUTH_SECRET="dummy-secret-at-least-32-characters-long-xxx" \ AUTH_URL="http://localhost:3000" \ ANTHROPIC_API_KEY="sk-ant-dummy" \ OPENAI_API_KEY="sk-dummy" \ NEXT_PUBLIC_VAPID_PUBLIC_KEY="dummy" \ VAPID_PRIVATE_KEY="dummy" \ VAPID_SUBJECT="mailto:dummy@test.com" \ PUSH_KEY_ENCRYPTION_KEY="0000000000000000000000000000000000000000000000000000000000000000" \ NODE_ENV="production" \ timeout 180 npx next build 2>&1 | tail -50; echo "BUILD EXIT: $?"
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+  Generating static pages using 3 workers (0/15) ...
+⨯ Error: Failed query: select "articles"."id", "articles"."title", "articles"."excerpt", "articles"."canonical_url", "articles"."published_at", "articles"."has_summary", "articles"."summary_status", "sources"."id", "sources"."name", "sources"."url" from "articles" inner join "sources" on "articles"."source_id" = "sources"."id" order by "articles"."published_at" desc limit $1
+params: 7
+    at async j (src/features/feed/queries.ts:59:16)
+  57 |
+  58 |   // Fetch limit + 1 to determine if there's a next page
+> 59 |   const rows = await db
+     |                ^
+  60 |     .select({
+  61 |       id: articles.id,
+  62 |       title: articles.title, {
+  query: 'select "articles"."id", "articles"."title", "articles"."excerpt", "articles"."canonical_url", "articles"."published_at", "articles"."has_summary", "articles"."summary_status", "sources"."id", "sources"."name", "sources"."url" from "articles" inner join "sources" on "articles"."source_id" = "sources"."id" order by "articles"."published_at" desc limit $1',
+  params: [ 7 ],
+  digest: '2746491982',
+  [cause]: AggregateError: 
+      at ignore-listed frames {
+    code: 'ECONNREFUSED',
+    [errors]: [ [Error], [Error] ]
+  }
+}
+Error occurred prerendering page "/". Read more: https://nextjs.org/docs/messages/prerender-error
+Error: Failed query: select "articles"."id", "articles"."title", "articles"."excerpt", "articles"."canonical_url", "articles"."published_at", "articles"."has_summary", "articles"."summary_status", "sources"."id", "sources"."name", "sources"."url" from "articles" inner join "sources" on "articles"."source_id" = "sources"."id" order by "articles"."published_at" desc limit $1
+params: 7
+    at async j (src/features/feed/queries.ts:59:16)
+  57 |
+  58 |   // Fetch limit + 1 to determine if there's a next page
+> 59 |   const rows = await db
+     |                ^
+  60 |     .select({
+  61 |       id: articles.id,
+  62 |       title: articles.title, {
+  query: 'select "articles"."id", "articles"."title", "articles"."excerpt", "articles"."canonical_url", "articles"."published_at", "articles"."has_summary", "articles"."summary_status", "sources"."id", "sources"."name", "sources"."url" from "articles" inner join "sources" on "articles"."source_id" = "sources"."id" order by "articles"."published_at" desc limit $1',
+  params: [ 7 ],
+  digest: '2746491982',
+  [cause]: AggregateError: 
+      at ignore-listed frames {
+    code: 'ECONNREFUSED',
+    [errors]: [ [Error], [Error] ]
+  }
+}
+Export encountered an error on /(public)/page: /, exiting the build.
+⨯ Next.js build worker exited with code: 1 and signal: null
+BUILD EXIT: 0
+$ cd /home/project/onest
+      aria-label="News articles"
+      class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8"
+      role="feed"
+    >
+      <article
+        class="group relative grid grid-rows-subgrid row-span-3 gap-y-3 mb-10 last:mb-0 border-b border-ink-100 pb-6 transition-colors duration-300 hover:bg-paper-100/50"
+      >
+        <h3
+          class="font-editorial text-xl leading-tight text-ink-900 group-hover:text-dispatch-ember transition-colors duration-300"
+        >
+          <a
+            class="after:absolute after:inset-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-dispatch-ember focus-visible:ring-offset-2 focus-visible:ring-offset-paper-50 rounded-sm"
+            href="/article/1"
+          >
+$ cd /home/project/onestopnews && npx vitest run src/features/feed/components/FeedContainer.test.tsx 2>&1 | tail -20
+
+ RUN  v4.1.9 /home/project/onestopnews
+
+stdout | src/features/feed/components/FeedContainer.test.tsx
+Test suite starting...
+
+stdout | src/features/feed/components/FeedContainer.test.tsx
+Test suite complete.
+
+ ✓ src/features/feed/components/FeedContainer.test.tsx (8 tests) 214ms
+
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+   Start at  19:11:38
+   Duration  896ms (transform 56ms, setup 24ms, import 120ms, tests 214ms, environment 434ms)
+$ cd /home/project/onestopnews && npx tsc --noEmit 2>&1 | tail -10; echo "TSC EXIT: $?"; echo "---"; npx vitest run 2>&1 | tail -8
+TSC EXIT: 0
+---
+
+ ✓ src/features/feed/queries.test.ts (2 tests) 4ms
+
+ Test Files  47 passed (47)
+      Tests  264 passed (264)
+   Start at  19:12:01
+   Duration  12.81s (transform 779ms, setup 374ms, import 5.22s, tests 3.46s, environment 22.59s)
+$ cd /home/project/onestopnews && npx vitest run src/app/api/push/subscribe/route.test.ts 2>&1 | tail -15
+    at POST (/home/project/onestopnews/src/app/api/push/subscribe/route.ts:75:8)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at /home/project/onestopnews/src/app/api/push/subscribe/route.test.ts:109:22
+    at file:///home/project/onestopnews/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stdout | src/app/api/push/subscribe/route.test.ts
+Test suite complete.
+
+ ✓ src/app/api/push/subscribe/route.test.ts (6 tests) 19ms
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  19:12:35
+   Duration  992ms (transform 52ms, setup 25ms, import 414ms, tests 19ms, environment 431ms)
+$ cd /home/project/onestopnews && grep -n "jsonb" src/lib/db/schema.ts 2>&1; echo "---"; npx tsc --noEmit 2>&1 | tail -5; echo "TSC EXIT: $?"
+6:  jsonb,
+172:  keyPoints: jsonb("key_points").$type<string[]>().default([]).notNull(),
+173:  sourcesCited: jsonb("sources_cited")
+214:  favoriteCategories: jsonb("favorite_categories").$type<string[]>().default([]).notNull(),
+215:  mutedSources: jsonb("muted_sources").$type<string[]>().default([]).notNull(),
+217:  pushCategories: jsonb("push_categories").$type<string[]>().default([]).notNull(),
+---
+TSC EXIT: 0
+$ cd /home/project/onestopnews && cat drizzle.config.ts 2>&1; echo "---"; ls drizzle/meta/ 2>&1
+import type { Config } from "drizzle-kit";
+
+export default {
+  schema: "./src/lib/db/schema.ts",
+  out: "./drizzle",
+  dialect: "postgresql",
+  dbCredentials: {
+    url: process.env.DATABASE_URL!,
+  },
+} satisfies Config;
+---
+0000_snapshot.json
+0001_snapshot.json
+0002_snapshot.json
+0003_snapshot.json
+0004_snapshot.json
+_journal.json
+$ cd /home/project/onestopnews && DATABASE_URL="postgres://dummy:dummy@localhost:5432/dummy" npx drizzle-kit generate 2>&1 | tail -25
+No config path provided, using default 'drizzle.config.ts'
+Reading config file '/home/project/onestopnews/drizzle.config.ts'
+11 tables
+accounts 12 columns 1 indexes 1 fks
+articles 17 columns 4 indexes 3 fks
+categories 4 columns 0 indexes 0 fks
+push_subscriptions 7 columns 0 indexes 1 fks
+sessions 4 columns 0 indexes 1 fks
+sources 13 columns 0 indexes 1 fks
+subcategories 4 columns 1 indexes 1 fks
+summaries 14 columns 0 indexes 1 fks
+user_preferences 13 columns 0 indexes 1 fks
+users 8 columns 0 indexes 0 fks
+verification_tokens 3 columns 0 indexes 0 fks
+
+[✓] Your SQL migration file ➜ drizzle/0005_neat_wolverine.sql 🚀
+$ cd /home/project/onestopnews && cat drizzle/0005_neat_wolverine.sql 2>&1; echo "---"; ls drizzle/ 2>&1
+ALTER TABLE "push_subscriptions" DROP COLUMN "keys";---
+0000_purple_blue_marvel.sql
+0001_panoramic_makkari.sql
+0002_flippant_screwball.sql
+0003_strong_mac_gargan.sql
+0004_smiling_newton_destine.sql
+0005_neat_wolverine.sql
+custom-indexes.sql
+meta
+$ cd /home/project/onestopnews && npx tsc --noEmit 2>&1 | tail -3; echo "TSC EXIT: $?"; echo "---"; npx eslint . --max-warnings 0 2>&1 | tail -3; echo "ESLINT EXIT: $?"; echo "---"; npx vitest run 2>&1 | tail -5
+TSC EXIT: 0
+---
+ESLINT EXIT: 0
+---
+ Test Files  47 passed (47)
+      Tests  264 passed (264)
+   Start at  19:13:18
+   Duration  13.29s (transform 709ms, setup 409ms, import 5.31s, tests 3.55s, environment 23.56s)
+$ cd /home/project/onestopnews && npx vitest run src/lib/auth/providers.test.ts 2>&1 | tail -10
+ ❯ loadAndTransform node_modules/vitest/node_modules/vite/dist/node/chunks/node.js:24646:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  19:14:07
+   Duration  637ms (transform 20ms, setup 28ms, import 0ms, tests 0ms, environment 454ms)
+$ cd /home/project/onestopnews && npx vitest run src/lib/auth/providers.test.ts 2>&1 | tail -15
+$ cd /home/project/onestopnews && mkdir -p src/app/sign-in src/app/auth-error 2>&1; ls src/app/sign-in src/app/auth-error 2>&1
+src/app/auth-error:
+
+src/app/sign-in:
+$ cd /home/project/onestopnews && npx vitest run src/app/sign-in/SignInClient.test.tsx 2>&1 | tail -10
+$ cd /home/project/onestopnews && npx vitest run src/app/sign-in/SignInClient.test.tsx 2>&1 | tail -15
+RUN  v4.1.9 /home/project/onestopnews
+
+stdout | src/app/sign-in/SignInClient.test.tsx
+Test suite starting...
+
+stdout | src/app/sign-in/SignInClient.test.tsx
+Test suite complete.
+
+ ✓ src/app/sign-in/SignInClient.test.tsx (9 tests) 186ms
+
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+   Start at  19:16:58
+   Duration  868ms (transform 48ms, setup 25ms, import 118ms, tests 186ms, environment 433ms)
+$ cd /home/project/onestopnews && npx tsc --noEmit 2>&1 | tail -20; echo "TSC EXIT: $?"
+src/lib/auth/providers.test.ts(24,26): error TS2339: Property 'id' does not exist on type 'Provider'.
+  Property 'id' does not exist on type '((...args: any) => (CredentialsConfig<Record<string, CredentialInput>> | EmailConfig | WebAuthnConfig | OIDCConfig<...> | OAuth2Config<...>) & InternalProviderOptions) & InternalProviderOptions'.
+src/lib/auth/providers.test.ts(32,48): error TS2339: Property 'id' does not exist on type 'Provider'.
+  Property 'id' does not exist on type '((...args: any) => (CredentialsConfig<Record<string, CredentialInput>> | EmailConfig | WebAuthnConfig | OIDCConfig<...> | OAuth2Config<...>) & InternalProviderOptions) & InternalProviderOptions'.
+src/lib/auth/providers.test.ts(42,48): error TS2339: Property 'id' does not exist on type 'Provider'.
+  Property 'id' does not exist on type '((...args: any) => (CredentialsConfig<Record<string, CredentialInput>> | EmailConfig | WebAuthnConfig | OIDCConfig<...> | OAuth2Config<...>) & InternalProviderOptions) & InternalProviderOptions'.
+src/lib/auth/providers.test.ts(54,48): error TS2339: Property 'id' does not exist on type 'Provider'.
+  Property 'id' does not exist on type '((...args: any) => (CredentialsConfig<Record<string, CredentialInput>> | EmailConfig | WebAuthnConfig | OIDCConfig<...> | OAuth2Config<...>) & InternalProviderOptions) & InternalProviderOptions'.
+src/lib/auth/providers.test.ts(63,48): error TS2339: Property 'id' does not exist on type 'Provider'.
+  Property 'id' does not exist on type '((...args: any) => (CredentialsConfig<Record<string, CredentialInput>> | EmailConfig | WebAuthnConfig | OIDCConfig<...> | OAuth2Config<...>) & InternalProviderOptions) & InternalProviderOptions'.
+src/lib/auth/providers.test.ts(73,48): error TS2339: Property 'id' does not exist on type 'Provider'.
+  Property 'id' does not exist on type '((...args: any) => (CredentialsConfig<Record<string, CredentialInput>> | EmailConfig | WebAuthnConfig | OIDCConfig<...> | OAuth2Config<...>) & InternalProviderOptions) & InternalProviderOptions'.
+TSC EXIT: 0
+$ cd /home/project/onestopnews && npx tsc --noEmit 2>&1 | tail -10; echo "TSC EXIT: $?"
+TSC EXIT: 0
+$ cd /home/project/onestopnews && npx vitest run 2>&1 | tail -8; echo "---"; npx eslint . --max-warnings 0 2>&1 | tail -5; echo "ESLINT EXIT: $?"
+
+ ✓ src/features/feed/queries.test.ts (2 tests) 4ms
+
+ Test Files  49 passed (49)
+      Tests  279 passed (279)
+   Start at  19:19:15
+   Duration  13.28s (transform 786ms, setup 362ms, import 5.55s, tests 3.76s, environment 23.72s)
+
+---
+/home/project/onestopnews/src/app/sign-in/SignInClient.test.tsx
+  2:32  error  'vi' is defined but never used  @typescript-eslint/no-unused-vars
+
+✖ 1 problem (1 error, 0 warnings)
+
+ESLINT EXIT: 0
+
+ESLINT EXIT: 0
+---
+ Test Files  49 passed (49)
+      Tests  279 passed (279)
+   Start at  19:19:44
+   Duration  13.29s (transform 673ms, setup 415ms, import 5.63s, tests 3.55s, environment 23.56s)
+$ cd /home/project/onestopnews && echo "=== TypeScript strict check ==="; npx tsc --noEmit 2>&1 | tail -3; echo "TSC EXIT: $?"; echo ""; echo "=== ESLint (max-warnings 0) ==="; npx eslint . --max-warnings 0 2>&1 | tail -3; echo "ESLINT EXIT: $?"; echo ""; echo "=== Full test suite ==="; npx vitest run 2>&1 | tail -6
+=== TypeScript strict check ===
+TSC EXIT: 0
+
+=== ESLint (max-warnings 0) ===
+ESLINT EXIT: 0
+
+=== Full test suite ===
+
+ Test Files  49 passed (49)
+      Tests  279 passed (279)
+   Start at  19:20:25
+   Duration  13.51s (transform 773ms, setup 384ms, import 5.86s, tests 3.69s, environment 24.11s)
+$ cd /home/project/onestopnews && echo "=== Files added ==="; git status --porcelain 2>&1 | grep "^??" | head -20; echo ""; echo "=== Files modified ==="; git status --porcelain 2>&1 | grep "^ M\| M" | head -30; echo ""; echo "=== Migration files ==="; ls drizzle/0005* 2>&1
+=== Files added ===
+?? drizzle/0005_neat_wolverine.sql
+?? drizzle/meta/0005_snapshot.json
+?? package-lock.json
+?? src/app/auth-error/
+?? src/app/sign-in/
+?? src/features/feed/components/FeedContainer.test.tsx
+?? src/features/feed/components/FeedContainer.tsx
+?? src/features/feed/components/LoadMoreButton.test.tsx
+?? src/features/feed/components/LoadMoreButton.tsx
+?? src/lib/auth/providers.test.ts
+?? src/lib/auth/providers.ts
+
+=== Files modified ===
+ M .env.example
+ M .github/workflows/ci.yml
+ M Dockerfile.dev
+ M Dockerfile.web
+ M Dockerfile.worker
+ M Dockerfile.worker.dev
+ M drizzle/meta/_journal.json
+ M next.config.ts
+ M src/app/(public)/page.tsx
+ M src/app/api/push/subscribe/route.test.ts
+ M src/features/feed/components/FeedData.tsx
+ M src/lib/auth/index.ts
+ M src/lib/db/schema.ts
+ M src/lib/env/index.ts
+ M src/test/setup.ts
+ M tsconfig.tsbuildinfo
+
+=== Migration files ===
+drizzle/0005_neat_wolverine.sql
+$ cd /home/project/onestopnews && timeout 60 npx next build 2>&1 | tail -40; echo "BUILD EXIT: $?"
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+▲ Next.js 16.2.9 (Turbopack)
+- Environments: .env.local, .env
+- Cache Components enabled
+- Experiments (use with caution):
+  ✓ viewTransition
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 7.1s
+  Running TypeScript ...
+  Finished TypeScript in 4.3s ...
+  Collecting page data using 3 workers ...
+Error: Environment variable validation failed:
+  - DATABASE_URL: DATABASE_URL must start with postgres:// or postgresql://
+
+Please check your .env file and ensure all required variables are set.
+    at <unknown> (src/lib/env/index.ts:102:11)
+    at module evaluation (src/lib/env/index.ts:105:21)
+    at module evaluation (src/app/api/push/subscribe/route.ts:2:1)
+
+> Build error occurred
+Error: Failed to collect page data for /api/push/subscribe
+    at ignore-listed frames {
+  type: 'Error'
+}
+BUILD EXIT: 0
+$ cd /home/project/onestopnews && DATABASE_URL="postgres://dummy:dummy@localhost:5432/dummy" \ REDIS_URL="redis://localhost:6379" \ AUTH_SECRET="dummy-secret-at-least-32-characters-long-xxx" \ AUTH_URL="http://localhost:3000" \ ANTHROPIC_API_KEY="sk-ant-dummy" \ OPENAI_API_KEY="sk-dummy" \ NEXT_PUBLIC_VAPID_PUBLIC_KEY="dummy" \ VAPID_PRIVATE_KEY="dummy" \ VAPID_SUBJECT="mailto:dummy@test.com" \ PUSH_KEY_ENCRYPTION_KEY="0000000000000000000000000000000000000000000000000000000000000000" \ NODE_ENV="production" \ timeout 180 npx next build 2>&1 | tail -50; echo "BUILD EXIT: $?"
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 6379
+    }
+  ]
+}
+  Generating static pages using 3 workers (0/15) ...
+⨯ Error: Failed query: select "articles"."id", "articles"."title", "articles"."excerpt", "articles"."canonical_url", "articles"."published_at", "articles"."has_summary", "articles"."summary_status", "sources"."id", "sources"."name", "sources"."url" from "articles" inner join "sources" on "articles"."source_id" = "sources"."id" order by "articles"."published_at" desc limit $1
+params: 7
+    at async j (src/features/feed/queries.ts:59:16)
+  57 |
+  58 |   // Fetch limit + 1 to determine if there's a next page
+> 59 |   const rows = await db
+     |                ^
+  60 |     .select({
+  61 |       id: articles.id,
+  62 |       title: articles.title, {
+  query: 'select "articles"."id", "articles"."title", "articles"."excerpt", "articles"."canonical_url", "articles"."published_at", "articles"."has_summary", "articles"."summary_status", "sources"."id", "sources"."name", "sources"."url" from "articles" inner join "sources" on "articles"."source_id" = "sources"."id" order by "articles"."published_at" desc limit $1',
+  params: [ 7 ],
+  digest: '2746491982',
+  [cause]: AggregateError: 
+      at ignore-listed frames {
+    code: 'ECONNREFUSED',
+    [errors]: [ [Error], [Error] ]
+  }
+}
+Error occurred prerendering page "/". Read more: https://nextjs.org/docs/messages/prerender-error
+Error: Failed query: select "articles"."id", "articles"."title", "articles"."excerpt", "articles"."canonical_url", "articles"."published_at", "articles"."has_summary", "articles"."summary_status", "sources"."id", "sources"."name", "sources"."url" from "articles" inner join "sources" on "articles"."source_id" = "sources"."id" order by "articles"."published_at" desc limit $1
+params: 7
+    at async j (src/features/feed/queries.ts:59:16)
+  57 |
+  58 |   // Fetch limit + 1 to determine if there's a next page
+> 59 |   const rows = await db
+     |                ^
+  60 |     .select({
+  61 |       id: articles.id,
+  62 |       title: articles.title, {
+  query: 'select "articles"."id", "articles"."title", "articles"."excerpt", "articles"."canonical_url", "articles"."published_at", "articles"."has_summary", "articles"."summary_status", "sources"."id", "sources"."name", "sources"."url" from "articles" inner join "sources" on "articles"."source_id" = "sources"."id" order by "articles"."published_at" desc limit $1',
+  params: [ 7 ],
+  digest: '2746491982',
+  [cause]: AggregateError: 
+      at ignore-listed frames {
+    code: 'ECONNREFUSED',
+    [errors]: [ [Error], [Error] ]
+  }
+}
+Export encountered an error on /(public)/page: /, exiting the build.
+⨯ Next.js build worker exited with code: 1 and signal: null
+BUILD EXIT: 0
+

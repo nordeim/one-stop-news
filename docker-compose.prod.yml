@@ -1,0 +1,105 @@
+# Phase 19 (M17): Removed legacy `version: '3.8'` key. Modern Docker Compose
+# v2 (since 2023) ignores this key and prints a deprecation warning. The
+# schema is inferred automatically.
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/onestopnews
+      - REDIS_URL=redis://redis:6379
+      - NODE_ENV=production
+      # Pass through auth env vars from host (set in .env.production or shell)
+      - AUTH_SECRET=${AUTH_SECRET:-}
+      - AUTH_URL=${AUTH_URL:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - NEXT_PUBLIC_VAPID_PUBLIC_KEY=${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
+      - VAPID_SUBJECT=${VAPID_SUBJECT:-}
+      - PUSH_KEY_ENCRYPTION_KEY=${PUSH_KEY_ENCRYPTION_KEY:-}
+      - TRUSTED_PROXY=${TRUSTED_PROXY:-}
+      # OAuth providers (optional — Credentials-only auth if blank)
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/onestopnews
+      - REDIS_URL=redis://redis:6379
+      - NODE_ENV=production
+      - AUTH_SECRET=${AUTH_SECRET:-}
+      - AUTH_URL=${AUTH_URL:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - PUSH_KEY_ENCRYPTION_KEY=${PUSH_KEY_ENCRYPTION_KEY:-}
+      - VAPID_SUBJECT=${VAPID_SUBJECT:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: onestopnews
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    # Production Redis hardening per MEP §4 / docker-compose-dev.yml pattern:
+    #   - noeviction policy: BullMQ jobs are NEVER evicted (BullMQ requires
+    #     this; without it, Redis returns OOM errors under memory pressure
+    #     and jobs are lost). The default Redis policy is noeviction, but
+    #     we set it explicitly to document intent and protect against
+    #     future Redis defaults changes.
+    #   - appendonly yes: AOF persistence so jobs survive Redis restarts.
+    #     Without AOF, jobs in memory are lost on restart (RDB snapshots
+    #     only run periodically and can lose up to 60s of data).
+    #   - save 60 1000: RDB snapshot every 60s if 1000+ keys changed
+    #     (belt-and-suspenders alongside AOF).
+    #   - maxmemory 1gb: production-appropriate limit (dev uses 512mb).
+    command: >
+      redis-server
+      --maxmemory 1gb
+      --maxmemory-policy noeviction
+      --appendonly yes
+      --save 60 1000
+      --loglevel warning
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:

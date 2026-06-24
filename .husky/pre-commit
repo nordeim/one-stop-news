@@ -1,0 +1,6 @@
+#!/bin/sh
+# Phase 19 (M10): Pre-commit hook running lint-staged.
+# Catches lint/type/prettier issues locally before they reach CI.
+# Activated by `pnpm run prepare` (which runs `husky` to install hooks).
+
+pnpm exec lint-staged

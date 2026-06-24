@@ -1,0 +1,29 @@
+# syntax=docker.io/docker/dockerfile:1.7-labs
+FROM node:24-alpine AS base
+
+RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
+
+# Install system dependencies (curl for optional healthcheck)
+RUN apk add --no-cache curl
+
+WORKDIR /app
+
+# Copy package manifests
+COPY package.json pnpm-lock.yaml ./
+
+RUN pnpm install --frozen-lockfile
+
+# Create non‑root user
+RUN addgroup -g 1001 -S onestopnews && \
+    adduser -S onestopnews -G onestopnews -u 1001 && \
+    chown -R onestopnews:onestopnews /app
+
+USER onestopnews
+
+# Healthcheck – simple process check (worker has no HTTP endpoint, so we check the process)
+# We'll rely on Docker's process monitoring; a custom healthcheck could use `pgrep` but it's optional.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD pgrep -f "tsx src/workers/index.ts" || exit 1
+
+# Start worker with tsx watch mode for hot reload
+CMD ["pnpm", "exec", "tsx", "watch", "src/workers/index.ts"]

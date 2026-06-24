@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OneStopNews — Your Briefing Room</title>
+    <meta name="description" content="Topic-first news aggregation with source-cited AI summaries. Every story, organized by what it's about — not who published it. EU AI Act Article 50 compliant.">
+
+    <!-- Machine-readable AI provenance (EU AI Act Art. 50 compliance — Layer 3 of 3) -->
+    <meta name="ai-provenance" content="model:claude-4.5-haiku;generated-at:2026-06-10T14:30:00+08:00;sources:0;coverage:n/a;compliance:eu-ai-act-art50">
+    <meta name="ai-disclosure" content="This landing page contains AI-generated demonstration content for mockup purposes only.">
+
+    <!-- OpenGraph -->
+    <meta property="og:title" content="OneStopNews — Your Briefing Room">
+    <meta property="og:description" content="Topic-first news aggregation with source-cited AI summaries. EU AI Act Article 50 compliant.">
+    <meta property="og:type" content="website">
+
+    <!-- PRD v4.3 §4.1: Bespoke Typography — Anti-generic, deliberate -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700;6..72,800&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/commit-mono@5.0.0/index.css">
+
+    <!-- Tailwind CSS v4 (Browser CDN — supports @theme natively) -->
+    <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+
+    <!-- PRD v4.3 §4.2: Design Tokens via Tailwind @theme -->
+    <style type="text/tailwindcss">
+        @theme {
+            /* ── Ink Scale ────────────────────────────────────────────── */
+            --color-ink-900:   #1a1a18;
+            --color-ink-700:   #2a2a27;
+            --color-ink-600:   #3d3d3a;
+            --color-ink-500:   #525250;
+            --color-ink-400:   #6b6b68;
+            --color-ink-300:   #8a8a83;
+            --color-ink-100:   #e8e8e4;
+
+            /* ── Paper Scale ──────────────────────────────────────────── */
+            --color-paper-50:  #fafaf8;
+            --color-paper-100: #f2f2ee;
+            --color-paper-200: #e6e4de;
+            --color-paper-300: #d8d4cc;
+
+            /* ── Dispatch Brand Accents ──────────────────────────────── */
+            --color-dispatch-ember:        #c7513f;
+            --color-dispatch-ember-light:  #fde8e4;
+            --color-dispatch-sage:         #6b8f71;
+            --color-dispatch-sage-light:   #e4ede5;
+            --color-dispatch-slate:        #5a6b7a;
+            --color-dispatch-slate-light:  #e2e7ec;
+            --color-dispatch-clay:         #8b6d5a;
+            --color-dispatch-clay-light:   #ede5df;
+            --color-dispatch-violet:       #7a6b8f;
+            --color-dispatch-violet-light: #e8e4ef;
+
+            /* ── Typography Stack — Explicit rejection: Inter, Roboto, Space Grotesk ── */
+            --font-editorial: 'Newsreader', Georgia, 'Times New Roman', serif;
+            --font-ui:        'Instrument Sans', system-ui, -apple-system, sans-serif;
+            --font-mono:      'Commit Mono', ui-monospace, 'Fira Code', monospace;
+        }
+    </style>
+
+    <style>
+        /* ═══════════════════════════════════════════════════════════════ */
+        /*  BASE & RENDERING                                             */
+        /* ═══════════════════════════════════════════════════════════════ */
+        * {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        ::selection {
+            background: var(--color-dispatch-violet-light);
+            color: var(--color-ink-900);
+        }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: var(--font-ui);
+            background-color: var(--color-paper-50);
+            color: var(--color-ink-600);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /*  SCROLL PROGRESS — CSS-only, scroll-driven animation          */
+        /* ═══════════════════════════════════════════════════════════════ */
+        .scroll-progress {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: var(--color-dispatch-ember);
+            transform-origin: left;
+            animation: scroll-progress linear;
+            animation-timeline: scroll();
+            z-index: 999;
+            pointer-events: none;
+        }
+        @keyframes scroll-progress {
+            from { transform: scaleX(0); }
+            to   { transform: scaleX(1); }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /*  WIRE TICKER — Seamless horizontal scroll                     */
+        /* ═══════════════════════════════════════════════════════════════ */
+        @keyframes ticker-scroll {
+            0%   { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+        .ticker-track {
+            animation: ticker-scroll 80s linear infinite;
+        }
+        .ticker-track:hover {
+            animation-play-state: paused;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /*  LIVE PULSE DOT                                               */
+        /* ═══════════════════════════════════════════════════════════════ */
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50%      { opacity: 0.25; }
+        }
+        .pulse-dot {
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /*  TYPOGRAPHIC UTILITIES                                        */
+        /* ═══════════════════════════════════════════════════════════════ */
+        .cat-label {
+            font-family: var(--font-mono);
+            font-variant: all-small-caps;
+            letter-spacing: 0.12em;
+        }
+        .cat-label-wide {
+            font-family: var(--font-mono);
+            font-variant: all-small-caps;
+            letter-spacing: 0.25em;
+        }
+        .font-editorial {
+            text-rendering: optimizeLegibility;
+            font-feature-settings: "ss01", "ss02";
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /*  EDITORIAL RULES — Wire service dividers                      */
+        /* ═══════════════════════════════════════════════════════════════ */
+        .dispatch-rule       { border: none; border-top: 1px solid var(--color-paper-300); margin: 0; }
+        .dispatch-rule-thick { border: none; border-top: 2.5px solid var(--color-ink-900); margin: 0; }
+        .dispatch-rule-ink   { border: none; border-top: 1px solid rgba(255,255,255,0.10); margin: 0; }
+        .dispatch-rule-ember { border: none; border-top: 2px solid var(--color-dispatch-ember); margin: 0; }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /*  PRD v4.3 §4.3: CSS SUBGRID FEED ARCHITECTURE                */
+        /*  Parent defines columns. Children span 3 row tracks via       */
+        /*  grid-rows-subgrid. Headline/Excerpt/Metadata align across    */
+        /*  cards without fixed heights or JS measurement.               */
+        /* ═══════════════════════════════════════════════════════════════ */
+        .story-card {
+            transition: background-color 200ms cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .story-card:hover {
+            background-color: var(--color-paper-100);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /*  CATEGORY NAV — Horizontal scroll, hidden scrollbar           */
+        /* ═══════════════════════════════════════════════════════════════ */
+        .category-nav {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        .category-nav::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /*  SORT BUTTONS                                                 */
+        /* ═══════════════════════════════════════════════════════════════ */
+        .sort-btn {
+            transition: background-color 150ms ease, color 150ms ease;
+        }
+        .sort-btn.active {
+            background-color: var(--color-ink-900);
+            color: var(--color-paper-50);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /*  AI NUTRITION LABEL — PRD v4.3 §4.4                          */
+        /* ═══════════════════════════════════════════════════════════════ */
+        .nutrition-label {
+            border-left: 3px solid var(--color-dispatch-ember);
+            background: linear-gradient(to right, var(--color-paper-100) 0%, var(--color-paper-50) 100%);
+        }
+        .confidence-bar {
+            height: 4px;
+            background: var(--color-paper-200);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .confidence-fill {
+            height: 100%;
+            background: var(--color-dispatch-sage);
+            border-radius: 2px;
+            width: 0;
+            transition: width 1200ms cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .confidence-fill.animate {
+            width: 87%;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /*  CITATION REFERENCES                                          */
+        /* ═══════════════════════════════════════════════════════════════ */
+        .citation-ref {
+            border-bottom: 1px dashed var(--color-dispatch-violet);
+            cursor: pointer;
+            transition: background 150ms ease;
+        }
+        .citation-ref:hover {
+            background-color: var(--color-dispatch-violet-light);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /*  BUTTON — Tactile Maximalism                                  */
+        /* ═══════════════════════════════════════════════════════════════ */
+        .btn-ember {
+            transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1),
+                        background-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+                        box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .btn-ember:hover {
+            transform: scale(1.02);
+            background-color: color-mix(in oklch, var(--color-dispatch-ember) 88%, black);
+            box-shadow: 0 4px 16px rgba(199, 81, 63, 0.25);
+        }
+        .btn-ember:active {
+            transform: scale(0.98);
+            box-shadow: none;
+        }
+
+        .btn-outline {
+            transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1),
+                        background-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+                        border-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .btn-outline:hover {
+            transform: scale(1.01);
+            background-color: var(--color-paper-100);
+            border-color: var(--color-ink-300);
+        }
+        .btn-outline:active {
+            transform: scale(0.99);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /*  LINK UNDERLINE ANIMATION                                     */
+        /* ═══════════════════════════════════════════════════════════════ */
+        .link-underline {
+            position: relative;
+        }
+        .link-underline::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 0;
+            height: 1px;
+            background-color: var(--color-dispatch-ember);
+            transition: width 200ms cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .link-underline:hover::after {
+            width: 100%;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /*  NOTIFICATION MOCKUP                                          */
+        /* ═══════════════════════════════════════════════════════════════ */
+        .notification-mockup {
+            background: rgba(26, 26, 24, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /*  COMMITMENT NUMBERS — Large faded editorial numerals          */
+        /* ═══════════════════════════════════════════════════════════════ */
+        .commitment-number {
+            font-family: var(--font-editorial);
+            font-size: 4.5rem;
+            line-height: 1;
+            opacity: 0.08;
+            position: absolute;
+            top: -12px;
+            right: 20px;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /*  FEATURE CHECK MARKS                                          */
+        /* ═══════════════════════════════════════════════════════════════ */
+        .feature-check::before {
+            content: '\2713';
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--color-dispatch-sage);
+            color: #fff;
+            font-size: 10px;
+            font-weight: 700;
+            margin-right: 10px;
+            flex-shrink: 0;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /*  CTA INPUT — Dark background input                            */
+        /* ═══════════════════════════════════════════════════════════════ */
+        .cta-input {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: var(--color-paper-50);
+            transition: border-color 150ms ease, background-color 150ms ease;
+        }
+        .cta-input::placeholder { color: var(--color-ink-300); }
+        .cta-input:focus {
+            outline: none;
+            border-color: var(--color-dispatch-ember);
+            background: rgba(255,255,255,0.10);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /*  INLINE CODE STYLE                                            */
+        /* ═══════════════════════════════════════════════════════════════ */
+        .code-inline {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            background: var(--color-paper-200);
+            padding: 1px 5px;
+            border-radius: 2px;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /*  ACCORDION — FAQ expand/collapse                              */
+        /* ═══════════════════════════════════════════════════════════════ */
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 300ms cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .accordion-content.open {
+            max-height: 500px;
+        }
+        .accordion-chevron {
+            transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .accordion-chevron.open {
+            transform: rotate(180deg);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /*  SCROLL REVEAL — Intersection Observer driven                 */
+        /* ═══════════════════════════════════════════════════════════════ */
+        .reveal {
+            opacity: 0;
+            transform: translateY(24px);
+            transition: opacity 700ms cubic-bezier(0.4, 0, 0.2, 1),
+                        transform 700ms cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .reveal-delay-1 { transition-delay: 80ms; }
+        .reveal-delay-2 { transition-delay: 160ms; }
+        .reveal-delay-3 { transition-delay: 240ms; }
+        .reveal-delay-4 { transition-delay: 320ms; }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /*  FOCUS STATES — WCAG AAA visible focus indicators             */
+        /* ═══════════════════════════════════════════════════════════════ */
+        :focus-visible {
+            outline: 2px solid var(--color-dispatch-ember);
+            outline-offset: 2px;
+            border-radius: 2px;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /*  REDUCED MOTION — Absolute requirement (WCAG AAA)             */
+        /*  When prefers-reduced-motion: reduce, DISABLE all animations  */
+        /*  entirely. Do NOT just slow them.                             */
+        /* ═══════════════════════════════════════════════════════════════ */
+        @media (prefers-reduced-motion: reduce) {
+            .ticker-track   { animation: none; }
+            .pulse-dot      { animation: none; }
+            .scroll-progress { animation: none; transform: scaleX(0); }
+            .reveal         { opacity: 1; transform: none; transition: none; }
+            .confidence-fill { transition: none; width: 87%; }
+            .story-card     { transition: none; }
+            .btn-ember      { transition: none; }
+            .btn-outline    { transition: none; }
+            .link-underline::after { transition: none; }
+            .accordion-content { transition: none; }
+            .accordion-chevron { transition: none; }
+            * {
+                transition-duration: 0ms !important;
+                animation-duration: 0ms !important;
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-paper-50 text-ink-600 font-ui">
+
+    <!-- Scroll Progress Indicator (CSS-only, scroll-driven) -->
+    <div class="scroll-progress" aria-hidden="true"></div>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- 1. WIRE TICKER — The always-on news pulse                        -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div class="bg-ink-900 text-paper-100 font-mono text-[11px] leading-none overflow-hidden" role="marquee" aria-label="Breaking news ticker">
+        <div class="ticker-track flex items-center whitespace-nowrap py-2.5 gap-10">
+            <span class="flex items-center gap-2"><span class="text-dispatch-ember font-semibold cat-label">Breaking</span> EU Parliament votes on AI Act enforcement framework — 142 in favor, 37 against</span>
+            <span class="text-paper-200 opacity-20" aria-hidden="true">|</span>
+            <span class="flex items-center gap-2"><span class="text-dispatch-sage font-semibold cat-label">Finance</span> Global markets rally as inflation data cools across G7 nations</span>
+            <span class="text-paper-200 opacity-20" aria-hidden="true">|</span>
+            <span class="flex items-center gap-2"><span class="text-dispatch-slate font-semibold cat-label">Tech</span> SpaceX Starship completes first orbital refueling test</span>
+            <span class="text-paper-200 opacity-20" aria-hidden="true">|</span>
+            <span class="flex items-center gap-2"><span class="text-dispatch-clay font-semibold cat-label">Politics</span> Japan central bank signals end to negative interest rate era</span>
+            <span class="text-paper-200 opacity-20" aria-hidden="true">|</span>
+            <span class="flex items-center gap-2"><span class="text-dispatch-violet font-semibold cat-label">Culture</span> WHO declares new mpox variant a public health emergency</span>
+            <span class="text-paper-200 opacity-20" aria-hidden="true">|</span>
+            <span class="flex items-center gap-2"><span class="text-dispatch-ember font-semibold cat-label">Breaking</span> Singapore MRT Cross Island Line Phase 2 alignment confirmed</span>
+            <span class="text-paper-200 opacity-20" aria-hidden="true">|</span>
+            <!-- Duplicate set for seamless scroll -->
+            <span class="flex items-center gap-2"><span class="text-dispatch-ember font-semibold cat-label">Breaking</span> EU Parliament votes on AI Act enforcement framework — 142 in favor, 37 against</span>
+            <span class="text-paper-200 opacity-20" aria-hidden="true">|</span>
+            <span class="flex items-center gap-2"><span class="text-dispatch-sage font-semibold cat-label">Finance</span> Global markets rally as inflation data cools across G7 nations</span>
+            <span class="text-paper-200 opacity-20" aria-hidden="true">|</span>
+            <span class="flex items-center gap-2"><span class="text-dispatch-slate font-semibold cat-label">Tech</span> SpaceX Starship completes first orbital refueling test</span>
+            <span class="text-paper-200 opacity-20" aria-hidden="true">|</span>
+            <span class="flex items-center gap-2"><span class="text-dispatch-clay font-semibold cat-label">Politics</span> Japan central bank signals end to negative interest rate era</span>
+            <span class="text-paper-200 opacity-20" aria-hidden="true">|</span>
+            <span class="flex items-center gap-2"><span class="text-dispatch-violet font-semibold cat-label">Culture</span> WHO declares new mpox variant a public health emergency</span>
+            <span class="text-paper-200 opacity-20" aria-hidden="true">|</span>
+            <span class="flex items-center gap-2"><span class="text-dispatch-ember font-semibold cat-label">Breaking</span> Singapore MRT Cross Island Line Phase 2 alignment confirmed</span>
+            <span class="text-paper-200 opacity-20" aria-hidden="true">|</span>
+        </div>
+    </div>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- 2. MASTHEAD — Newspaper-style wordmark with edition bar          -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <header class="border-b border-paper-300">
+        <div class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
+            <!-- Edition bar — metadata row -->
+            <div class="flex items-center justify-between py-2.5 border-b border-paper-200 font-mono text-[11px] text-ink-400">
+                <div class="flex items-center gap-4">
+                    <span class="cat-label">Edition 3.1</span>
+                    <span class="hidden sm:inline text-paper-300" aria-hidden="true">&mdash;</span>
+                    <span class="hidden sm:inline">10 June 2026</span>
+                    <span class="hidden sm:inline text-paper-300" aria-hidden="true">&middot;</span>
+                    <span class="hidden sm:inline">Singapore</span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <span class="flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-dispatch-ember pulse-dot" aria-hidden="true"></span>
+                        <span class="text-dispatch-ember font-medium cat-label">Live</span>
+                    </span>
+                    <span class="hidden sm:inline">SGT 14:30</span>
+                </div>
+            </div>
+
+            <!-- Wordmark — The one unmistakable thing -->
+            <div class="py-8 sm:py-12 text-center">
+                <h1 class="font-editorial text-6xl sm:text-7xl lg:text-8xl font-[800] tracking-[-0.03em] text-ink-900" style="line-height: 0.93; font-variation-settings: 'opsz' 72">
+                    OneStopNews
+                </h1>
+                <p class="mt-3 font-mono text-[11px] text-ink-300 cat-label-wide tracking-[0.35em]">Your Briefing Room</p>
+            </div>
+
+            <!-- Thin column rules — broadsheet aesthetic -->
+            <div class="hidden lg:flex justify-between px-[12%] pb-3" aria-hidden="true">
+                <div class="w-px h-4 bg-paper-300"></div>
+                <div class="w-px h-4 bg-paper-300"></div>
+                <div class="w-px h-4 bg-paper-300"></div>
+                <div class="w-px h-4 bg-paper-300"></div>
+                <div class="w-px h-4 bg-paper-300"></div>
+                <div class="w-px h-4 bg-paper-300"></div>
+            </div>
+        </div>
+    </header>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- 3. CATEGORY NAVIGATION — Sticky topic rail                       -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <nav class="sticky top-0 z-40 bg-paper-50/95 backdrop-blur-sm border-b border-paper-300" aria-label="Topic categories">
+        <div class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="category-nav flex items-center gap-1 py-2.5 overflow-x-auto" role="tablist">
+                <button role="tab" aria-selected="true" class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium whitespace-nowrap border-b-2 border-dispatch-ember text-ink-900 bg-dispatch-ember-light/40 transition-colors duration-150">
+                    <span class="w-2 h-2 rounded-full bg-dispatch-ember" aria-hidden="true"></span>
+                    Top Stories
+                    <span class="font-mono text-[10px] text-ink-400 ml-0.5">247</span>
+                </button>
+                <button role="tab" aria-selected="false" class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-ink-600 hover:text-ink-900 hover:bg-paper-100 transition-colors duration-150">
+                    <span class="w-2 h-2 rounded-full bg-dispatch-clay" aria-hidden="true"></span>
+                    Local
+                    <span class="font-mono text-[10px] text-ink-400 ml-0.5">83</span>
+                </button>
+                <button role="tab" aria-selected="false" class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-ink-600 hover:text-ink-900 hover:bg-paper-100 transition-colors duration-150">
+                    <span class="w-2 h-2 rounded-full bg-dispatch-slate" aria-hidden="true"></span>
+                    Tech
+                    <span class="font-mono text-[10px] text-ink-400 ml-0.5">156</span>
+                </button>
+                <button role="tab" aria-selected="false" class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-ink-600 hover:text-ink-900 hover:bg-paper-100 transition-colors duration-150">
+                    <span class="w-2 h-2 rounded-full bg-dispatch-slate" aria-hidden="true"></span>
+                    Global
+                    <span class="font-mono text-[10px] text-ink-400 ml-0.5">194</span>
+                </button>
+                <button role="tab" aria-selected="false" class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-ink-600 hover:text-ink-900 hover:bg-paper-100 transition-colors duration-150">
+                    <span class="w-2 h-2 rounded-full bg-dispatch-sage" aria-hidden="true"></span>
+                    Finance
+                    <span class="font-mono text-[10px] text-ink-400 ml-0.5">121</span>
+                </button>
+                <button role="tab" aria-selected="false" class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-ink-600 hover:text-ink-900 hover:bg-paper-100 transition-colors duration-150">
+                    <span class="w-2 h-2 rounded-full bg-dispatch-clay" aria-hidden="true"></span>
+                    Politics
+                    <span class="font-mono text-[10px] text-ink-400 ml-0.5">68</span>
+                </button>
+                <button role="tab" aria-selected="false" class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-ink-600 hover:text-ink-900 hover:bg-paper-100 transition-colors duration-150">
+                    <span class="w-2 h-2 rounded-full bg-dispatch-violet" aria-hidden="true"></span>
+                    Culture
+                    <span class="font-mono text-[10px] text-ink-400 ml-0.5">92</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- 4. LEAD STORY — The Hero IS the News                            -->
+    <!--     Anti-generic: No generic hero split. The headline dominates.  -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-8 reveal" aria-label="Lead story">
+        <!-- Category label -->
+        <div class="flex items-center gap-3 mb-5">
+            <span class="w-2.5 h-2.5 rounded-full bg-dispatch-slate" aria-hidden="true"></span>
+            <span class="font-mono text-[11px] cat-label text-dispatch-slate font-semibold">Tech News / AI &amp; ML</span>
+        </div>
+
+        <!-- Image + Headline layout — Asymmetric 7:5 grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12">
+            <!-- Image — 7 columns -->
+            <div class="lg:col-span-7">
+                <div class="relative overflow-hidden bg-paper-200 aspect-[16/9] lg:aspect-[16/10]">
+                    <img src="https://picsum.photos/seed/eu-ai-act-vote/1200/750.jpg"
+                         alt="European Parliament building during a key legislative session on AI regulation"
+                         class="w-full h-full object-cover"
+                         width="1200" height="750" loading="eager">
+                    <!-- Breaking badge -->
+                    <div class="absolute top-3 left-3 flex items-center gap-1.5 bg-dispatch-ember/95 px-2.5 py-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-white pulse-dot" aria-hidden="true"></span>
+                        <span class="font-mono text-[10px] text-white font-semibold cat-label">Breaking</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Headline + Meta — 5 columns -->
+            <div class="lg:col-span-5 flex flex-col justify-center">
+                <h2 class="font-editorial text-3xl sm:text-4xl lg:text-[46px] font-[800] leading-[1.05] tracking-[-0.02em] text-ink-900" style="font-variation-settings: 'opsz' 72">
+                    The Alignment Problem Is Now a Policy Problem
+                </h2>
+                <div class="mt-5 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] text-ink-600">
+                    <span class="flex items-center gap-1"><i data-lucide="users" class="w-3 h-3"></i> Reuters, AP, TechCrunch</span>
+                    <span aria-hidden="true">&middot;</span>
+                    <span>42 min ago</span>
+                    <span aria-hidden="true">&middot;</span>
+                    <span class="flex items-center gap-1 text-dispatch-sage"><i data-lucide="file-text" class="w-3 h-3"></i> 3 sources</span>
+                </div>
+                <p class="mt-5 text-ink-600 text-[15px] leading-relaxed">
+                    As the EU's AI Act enforcement framework enters its final legislative stage, the debate has shifted from technical alignment to geopolitical competition. Three major outlets now cover the rift between member states on enforcement timelines.
+                </p>
+                <div class="mt-6 flex flex-wrap items-center gap-3">
+                    <span class="inline-flex items-center gap-1.5 bg-dispatch-ember/10 text-dispatch-ember border border-dispatch-ember/20 px-2.5 py-1 font-mono text-[11px] font-medium">
+                        <i data-lucide="sparkles" class="w-3 h-3"></i> AI Summary Available
+                    </span>
+                    <a href="#ai-summary-demo" class="inline-flex items-center gap-1.5 text-ink-900 font-medium text-sm hover:text-dispatch-ember transition-colors duration-150">
+                        View Nutrition Label <i data-lucide="arrow-down" class="w-3.5 h-3.5"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <hr class="dispatch-rule max-w-[1440px] mx-auto" aria-hidden="true">
+
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- 5. STORY GRID — CSS Subgrid Feed Architecture                    -->
+    <!--     PRD v4.3 §4.3: Parent defines columns. Children span 3 rows  -->
+    <!--     via subgrid. Headline/Excerpt/Metadata align across cards.    -->
+    /* ═══════════════════════════════════════════════════════════════════ -->
+    <section class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-10" aria-label="Latest stories">
+        <div class="flex items-center justify-between mb-6">
+            <h3 class="font-mono text-[12px] cat-label text-ink-400 tracking-[0.15em]">Latest Stories</h3>
+            <div class="flex items-center gap-2 font-mono text-[11px] text-ink-400">
+                <button class="sort-btn active px-2 py-1">Latest</button>
+                <button class="sort-btn px-2 py-1">Impact</button>
+                <button class="sort-btn px-2 py-1">Summarized</button>
+            </div>
+        </div>
+
+        <!-- Subgrid Grid: Parent defines columns, children align via subgrid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-10" role="feed" aria-label="News articles">
+
+            <!-- Card 1 -->
+            <article class="story-card grid grid-rows-subgrid row-span-3 gap-y-3 mb-12 border-b border-paper-200 pb-6 reveal">
+                <h4 class="font-editorial text-xl font-[700] leading-tight text-ink-900 tracking-[-0.01em]">
+                    <a href="#" class="hover:text-dispatch-ember transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dispatch-ember focus-visible:ring-offset-2 focus-visible:ring-offset-paper-50 rounded-sm">
+                        Global Markets Rally as G7 Inflation Cools for Third Straight Month
+                    </a>
+                </h4>
+                <p class="text-ink-600 text-sm leading-relaxed line-clamp-3">
+                    Benchmark indices across major economies posted gains after synchronized inflation data suggested central banks may have room to ease monetary policy in Q3.
+                </p>
+                <div class="flex items-center gap-3 font-mono text-[10px] uppercase tracking-wider text-ink-600 mt-auto">
+                    <span class="text-dispatch-sage font-medium truncate">Bloomberg, Reuters</span>
+                    <span class="w-1 h-1 rounded-full bg-ink-600/50 shrink-0" aria-hidden="true"></span>
+                    <time datetime="2026-06-10T13:30:00+08:00" class="shrink-0 tabular-nums">1h ago</time>
+                    <span class="w-1 h-1 rounded-full bg-ink-600/50 shrink-0" aria-hidden="true"></span>
+                    <span class="text-dispatch-ember font-medium shrink-0 tracking-widest">AI Brief</span>
+                </div>
+            </article>
+
+            <!-- Card 2 -->
+            <article class="story-card grid grid-rows-subgrid row-span-3 gap-y-3 mb-12 border-b border-paper-200 pb-6 reveal reveal-delay-1">
+                <h4 class="font-editorial text-xl font-[700] leading-tight text-ink-900 tracking-[-0.01em]">
+                    <a href="#" class="hover:text-dispatch-ember transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dispatch-ember focus-visible:ring-offset-2 focus-visible:ring-offset-paper-50 rounded-sm">
+                        Apple Unveils On-Device AI Framework With App Store Integration
+                    </a>
+                </h4>
+                <p class="text-ink-600 text-sm leading-relaxed line-clamp-3">
+                    The new framework allows third-party apps to tap into Apple Intelligence models running locally on iPhone and Mac, marking a shift toward edge computing.
+                </p>
+                <div class="flex items-center gap-3 font-mono text-[10px] uppercase tracking-wider text-ink-600 mt-auto">
+                    <span class="text-dispatch-slate font-medium truncate">The Verge, 9to5Mac</span>
+                    <span class="w-1 h-1 rounded-full bg-ink-600/50 shrink-0" aria-hidden="true"></span>
+                    <time datetime="2026-06-10T12:30:00+08:00" class="shrink-0 tabular-nums">2h ago</time>
+                </div>
+            </article>
+
+            <!-- Card 3 -->
+            <article class="story-card grid grid-rows-subgrid row-span-3 gap-y-3 mb-12 border-b border-paper-200 pb-6 reveal reveal-delay-2">
+                <h4 class="font-editorial text-xl font-[700] leading-tight text-ink-900 tracking-[-0.01em]">
+                    <a href="#" class="hover:text-dispatch-ember transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dispatch-ember focus-visible:ring-offset-2 focus-visible:ring-offset-paper-50 rounded-sm">
+                        GE2025: Campaign Enters Final Week With Housing Policy as Key Battleground
+                    </a>
+                </h4>
+                <p class="text-ink-600 text-sm leading-relaxed line-clamp-3">
+                    Candidates sharpen their positions on public housing supply and affordability as polling shows the issue has become decisive for undecided voters.
+                </p>
+                <div class="flex items-center gap-3 font-mono text-[10px] uppercase tracking-wider text-ink-600 mt-auto">
+                    <span class="text-dispatch-clay font-medium truncate">CNA, Straits Times</span>
+                    <span class="w-1 h-1 rounded-full bg-ink-600/50 shrink-0" aria-hidden="true"></span>
+                    <time datetime="2026-06-10T11:30:00+08:00" class="shrink-0 tabular-nums">3h ago</time>
+                    <span class="w-1 h-1 rounded-full bg-ink-600/50 shrink-0" aria-hidden="true"></span>
+                    <span class="text-dispatch-ember font-medium shrink-0 tracking-widest">AI Brief</span>
+                </div>
+            </article>
+
+            <!-- Card 4 -->
+            <article class="story-card grid grid-rows-subgrid row-span-3 gap-y-3 mb-12 border-b border-paper-200 pb-6 reveal">
+                <h4 class="font-editorial text-xl font-[700] leading-tight text-ink-900 tracking-[-0.01em]">
+                    <a href="#" class="hover:text-dispatch-ember transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dispatch-ember focus-visible:ring-offset-2 focus-visible:ring-offset-paper-50 rounded-sm">
+                        Major K-pop Agency Launches AI Artist Management Division
+                    </a>
+                </h4>
+                <p class="text-ink-600 text-sm leading-relaxed line-clamp-3">
+                    The move signals a broader industry shift toward virtual performers, raising questions about labor, copyright, and fan engagement in the digital age.
+                </p>
+                <div class="flex items-center gap-3 font-mono text-[10px] uppercase tracking-wider text-ink-600 mt-auto">
+                    <span class="text-dispatch-violet font-medium truncate">Korea Herald</span>
+                    <span class="w-1 h-1 rounded-full bg-ink-600/50 shrink-0" aria-hidden="true"></span>
+                    <time datetime="2026-06-10T10:30:00+08:00" class="shrink-0 tabular-nums">4h ago</time>
+                    <span class="w-1 h-1 rounded-full bg-ink-600/50 shrink-0" aria-hidden="true"></span>
+                    <span class="text-dispatch-ember font-medium shrink-0 tracking-widest">AI Brief</span>
+                </div>
+            </article>
+
+            <!-- Card 5 -->
+            <article class="story-card grid grid-rows-subgrid row-span-3 gap-y-3 mb-12 border-b border-paper-200 pb-6 reveal reveal-delay-1">
+                <h4 class="font-editorial text-xl font-[700] leading-tight text-ink-900 tracking-[-0.01em]">
+                    <a href="#" class="hover:text-dispatch-ember transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dispatch-ember focus-visible:ring-offset-2 focus-visible:ring-offset-paper-50 rounded-sm">
+                        China Announces $40B Semiconductor Subsidy Package Amid Export Controls
+                    </a>
+                </h4>
+                <p class="text-ink-600 text-sm leading-relaxed line-clamp-3">
+                    The state-backed investment targets legacy chip manufacturing and advanced packaging, aiming to reduce dependence on foreign technology by 2030.
+                </p>
+                <div class="flex items-center gap-3 font-mono text-[10px] uppercase tracking-wider text-ink-600 mt-auto">
+                    <span class="text-dispatch-slate font-medium truncate">SCMP, Reuters</span>
+                    <span class="w-1 h-1 rounded-full bg-ink-600/50 shrink-0" aria-hidden="true"></span>
+                    <time datetime="2026-06-10T09:30:00+08:00" class="shrink-0 tabular-nums">5h ago</time>
+                </div>
+            </article>
+
+            <!-- Card 6 -->
+            <article class="story-card grid grid-rows-subgrid row-span-3 gap-y-3 mb-12 border-b border-paper-200 pb-6 reveal reveal-delay-2">
+                <h4 class="font-editorial text-xl font-[700] leading-tight text-ink-900 tracking-[-0.01em]">
+                    <a href="#" class="hover:text-dispatch-ember transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dispatch-ember focus-visible:ring-offset-2 focus-visible:ring-offset-paper-50 rounded-sm">
+                        WHO Declares New Mpox Variant a Public Health Emergency
+                    </a>
+                </h4>
+                <p class="text-ink-600 text-sm leading-relaxed line-clamp-3">
+                    The designation unlocks emergency funding and coordinated response mechanisms as cases spread across Central Africa and neighboring regions.
+                </p>
+                <div class="flex items-center gap-3 font-mono text-[10px] uppercase tracking-wider text-ink-600 mt-auto">
+                    <span class="text-dispatch-violet font-medium truncate">WHO, AP News</span>
+                    <span class="w-1 h-1 rounded-full bg-ink-600/50 shrink-0" aria-hidden="true"></span>
+                    <time datetime="2026-06-10T08:30:00+08:00" class="shrink-0 tabular-nums">6h ago</time>
+                    <span class="w-1 h-1 rounded-full bg-ink-600/50 shrink-0" aria-hidden="true"></span>
+                    <span class="text-dispatch-ember font-medium shrink-0 tracking-widest">AI Brief</span>
+                </div>
+            </article>
+        </div>
+
+        <!-- Load More -->
+        <div class="mt-8 text-center">
+            <button class="btn-outline inline-flex items-center gap-2 border border-ink-100 bg-paper-50 text-ink-900 font-mono text-[11px] uppercase tracking-widest px-8 py-3 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dispatch-ember focus-visible:ring-offset-2 focus-visible:ring-offset-paper-50">
+                Load More Stories
+            </button>
+        </div>
+    </section>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- 6. AI NUTRITION LABEL — PRD v4.3 §4.4                           -->
+    <!--     Human-readable AI disclosure. EU AI Act Article 50.          -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section id="ai-summary-demo" class="bg-paper-100 border-y border-ink-100 py-20 reveal" aria-label="AI Nutrition Label demonstration">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6">
+            <div class="text-center mb-14">
+                <span class="font-mono text-[10px] uppercase tracking-widest text-dispatch-ember mb-3 block">Core Feature</span>
+                <h2 class="font-editorial text-3xl md:text-4xl font-[800] text-ink-900 tracking-tight mb-4" style="font-variation-settings: 'opsz' 72">The AI Nutrition Label</h2>
+                <p class="font-ui text-ink-600 max-w-2xl mx-auto text-base leading-relaxed">
+                    Every AI summary shows exactly what the AI did, which sources it used, and how much of the original content it analyzed. Not a black box &mdash; an evidentiary record. Full EU AI Act Article 50 compliance, three layers deep: JSON-LD, HTTP header, and the label you see here.
+                </p>
+            </div>
+
+            <!-- The Nutrition Label Component -->
+            <aside aria-label="AI-generated summary transparency label" class="nutrition-label pl-6 py-6 pr-6 rounded-r-sm shadow-sm">
+                <!-- Header row -->
+                <div class="flex items-center gap-2 mb-6 font-mono text-[10px] uppercase tracking-widest text-ink-300">
+                    <span class="block w-1.5 h-1.5 rounded-full bg-dispatch-ember shrink-0" aria-hidden="true"></span>
+                    <span>AI Briefing</span>
+                    <span aria-hidden="true">&middot;</span>
+                    <span class="text-ink-600">Claude 4.5 Haiku</span>
+                    <span aria-hidden="true">&middot;</span>
+                    <time datetime="2026-06-10T14:28:00+08:00" class="text-ink-600">2 min ago</time>
+                </div>
+
+                <!-- Summary text with inline citations -->
+                <p class="font-ui text-base leading-relaxed text-ink-900 mb-8">
+                    The EU's AI Act enforcement framework has passed its final parliamentary vote with 142 in favor and 37 against.<sup class="text-dispatch-ember font-bold cursor-pointer citation-ref px-0.5">1</sup> The legislation classifies AI systems into four risk tiers, with "high-risk" systems facing mandatory conformity assessments.<sup class="text-dispatch-ember font-bold cursor-pointer citation-ref px-0.5">2</sup> Real-time biometric surveillance in public spaces is banned with limited exceptions for serious crime.<sup class="text-dispatch-ember font-bold cursor-pointer citation-ref px-0.5">3</sup>
+                </p>
+
+                <!-- Confidence bar -->
+                <div class="mb-8">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="font-mono text-[10px] uppercase tracking-widest text-ink-300">Source Coverage</span>
+                        <span class="font-mono text-[11px] text-ink-600 font-medium">87%</span>
+                    </div>
+                    <div class="confidence-bar">
+                        <div class="confidence-fill" id="confidenceFill"></div>
+                    </div>
+                </div>
+
+                <!-- Transparency Label -->
+                <div class="border-t border-ink-100 pt-6 space-y-3 mb-8">
+                    <h4 class="font-mono text-[10px] uppercase tracking-widest text-ink-300 mb-4">AI Transparency Label</h4>
+                    <ul class="space-y-3 font-ui text-sm text-ink-600">
+                        <li class="flex gap-2"><span class="font-semibold text-ink-900 min-w-[140px]">What the AI did:</span> 3-point summary of a 1,200-word article, generated from the article text as its only source.</li>
+                        <li class="flex gap-2"><span class="font-semibold text-ink-900 min-w-[140px]">Model:</span> Claude 4.5 Haiku <span class="text-ink-300 ml-1">(temperature: 0.1 &middot; factual-only mode)</span></li>
+                        <li class="flex gap-2"><span class="font-semibold text-ink-900 min-w-[140px]">Source coverage:</span> 87% of available article text analysed</li>
+                        <li class="flex gap-2"><span class="font-semibold text-ink-900 min-w-[140px]">Citations:</span> 3 sources verified</li>
+                        <li class="flex gap-2"><span class="font-semibold text-ink-900 min-w-[140px]">Compliance:</span> EU AI Act Article 50 compliant</li>
+                    </ul>
+                </div>
+
+                <!-- Sources Cited -->
+                <div class="space-y-3 mb-8">
+                    <h4 class="font-mono text-[10px] uppercase tracking-widest text-ink-300 border-b border-ink-100 pb-2">Sources Cited</h4>
+                    <ol class="space-y-2 list-none p-0 m-0 font-ui text-sm">
+                        <li class="flex items-baseline gap-3">
+                            <span class="font-mono text-ink-300 shrink-0 tabular-nums">[1]</span>
+                            <a href="#" class="text-ink-600 hover:text-dispatch-ember underline decoration-ink-100 hover:decoration-dispatch-ember transition-colors duration-200">Reuters &mdash; "EU Parliament votes on AI Act enforcement framework"</a>
+                        </li>
+                        <li class="flex items-baseline gap-3">
+                            <span class="font-mono text-ink-300 shrink-0 tabular-nums">[2]</span>
+                            <a href="#" class="text-ink-600 hover:text-dispatch-ember underline decoration-ink-100 hover:decoration-dispatch-ember transition-colors duration-200">AP News &mdash; "High-risk classification under the new AI legislation"</a>
+                        </li>
+                        <li class="flex items-baseline gap-3">
+                            <span class="font-mono text-ink-300 shrink-0 tabular-nums">[3]</span>
+                            <a href="#" class="text-ink-600 hover:text-dispatch-ember underline decoration-ink-100 hover:decoration-dispatch-ember transition-colors duration-200">TechCrunch &mdash; "Biometric surveillance ban: exceptions and implications"</a>
+                        </li>
+                    </ol>
+                </div>
+
+                <!-- Verify link -->
+                <a href="#" class="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-wider text-ink-900 hover:text-dispatch-ember transition-colors duration-200 font-medium link-underline">
+                    Verify with original source <span aria-hidden="true">&rarr;</span>
+                </a>
+            </aside>
+        </div>
+    </section>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- 7. DAILY BRIEFING — Push notification + Email preview             -->
+    <!--     PRD v4.3 §2.1 Goal 5: Drive daily habits via push + email    -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-20 reveal" aria-label="Daily briefing features">
+        <div class="text-center mb-14">
+            <span class="font-mono text-[10px] uppercase tracking-widest text-dispatch-ember mb-3 block">Daily Habits</span>
+            <h2 class="font-editorial text-3xl md:text-4xl font-[800] text-ink-900 tracking-tight mb-4" style="font-variation-settings: 'opsz' 72">Your morning briefing,<br>before you open the app.</h2>
+            <p class="font-ui text-ink-600 max-w-2xl mx-auto">
+                AI-summarised push notifications and a daily briefing email deliver the essential stories to you. One sentence per story. Zero noise. Quiet hours respected.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
+            <!-- Push Notification Mockup -->
+            <div class="flex flex-col items-center reveal">
+                <span class="font-mono text-[10px] uppercase tracking-widest text-ink-300 mb-4">Push Notification</span>
+                <div class="notification-mockup rounded-xl p-4 max-w-sm w-full shadow-xl">
+                    <div class="flex items-start gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-dispatch-ember flex items-center justify-center shrink-0">
+                            <span class="font-editorial text-white font-[800] text-sm">OS</span>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="font-ui text-[13px] font-semibold text-paper-50">OneStopNews</span>
+                                <span class="font-mono text-[10px] text-ink-300">2m ago</span>
+                            </div>
+                            <p class="font-ui text-[13px] text-paper-100 leading-snug mb-1">
+                                <span class="font-semibold">AI Brief:</span> EU AI Act passes final vote with strong majority, classifying systems into four risk tiers with mandatory assessments for high-risk applications.
+                            </p>
+                            <div class="flex items-center gap-2 mt-2">
+                                <span class="font-mono text-[9px] uppercase tracking-widest text-dispatch-ember">3 sources cited</span>
+                                <span class="text-ink-300" aria-hidden="true">&middot;</span>
+                                <span class="font-mono text-[9px] uppercase tracking-widest text-ink-300">87% coverage</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <p class="mt-4 font-ui text-xs text-ink-300 text-center max-w-xs">
+                    Push notifications include a 1-sentence AI summary and source coverage indicator. Quiet hours configurable.
+                </p>
+            </div>
+
+            <!-- Email Briefing Preview -->
+            <div class="flex flex-col items-center reveal reveal-delay-1">
+                <span class="font-mono text-[10px] uppercase tracking-widest text-ink-300 mb-4">Email Briefing</span>
+                <div class="bg-white border border-paper-200 rounded-lg shadow-sm max-w-sm w-full overflow-hidden">
+                    <!-- Email header -->
+                    <div class="border-b border-paper-200 px-5 py-3">
+                        <div class="flex items-center justify-between">
+                            <span class="font-mono text-[10px] uppercase tracking-widest text-dispatch-ember font-medium">OneStopNews Daily</span>
+                            <span class="font-mono text-[10px] text-ink-300">10 Jun 2026</span>
+                        </div>
+                        <p class="font-editorial text-lg font-[700] text-ink-900 mt-1 tracking-tight">7 stories you need today</p>
+                    </div>
+                    <!-- Email body preview -->
+                    <div class="px-5 py-4 space-y-3">
+                        <div class="flex items-start gap-3">
+                            <span class="w-1.5 h-1.5 rounded-full bg-dispatch-slate mt-1.5 shrink-0" aria-hidden="true"></span>
+                            <div>
+                                <p class="font-ui text-sm text-ink-900 font-medium leading-snug">EU AI Act enforcement framework passes final parliamentary vote</p>
+                                <p class="font-mono text-[10px] text-ink-300 mt-0.5">3 sources &middot; AI Brief available</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="w-1.5 h-1.5 rounded-full bg-dispatch-sage mt-1.5 shrink-0" aria-hidden="true"></span>
+                            <div>
+                                <p class="font-ui text-sm text-ink-900 font-medium leading-snug">G7 inflation cools for third month; markets rally</p>
+                                <p class="font-mono text-[10px] text-ink-300 mt-0.5">2 sources</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="w-1.5 h-1.5 rounded-full bg-dispatch-clay mt-1.5 shrink-0" aria-hidden="true"></span>
+                            <div>
+                                <p class="font-ui text-sm text-ink-900 font-medium leading-snug">Singapore GE2025: Final week housing policy debate</p>
+                                <p class="font-mono text-[10px] text-ink-300 mt-0.5">2 sources &middot; AI Brief available</p>
+                            </div>
+                        </div>
+                        <p class="font-mono text-[10px] text-ink-300 pt-2">+ 4 more stories</p>
+                    </div>
+                </div>
+                <p class="mt-4 font-ui text-xs text-ink-300 text-center max-w-xs">
+                    Delivered at your preferred time. Unsubscribe anytime. No AI-generated newsletters &mdash; just the stories.
+                </p>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- 8. HOW IT WORKS — Asymmetric 4:8 grid layout                     -->
+    <!--     Anti-generic: No 3-column equal card grid.                   -->
+    /* ═══════════════════════════════════════════════════════════════════ */
+    <section class="bg-ink-900 text-paper-100 py-24 reveal" aria-label="How OneStopNews works">
+        <div class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid md:grid-cols-12 gap-12 md:gap-16">
+                <!-- Left column — heading -->
+                <div class="md:col-span-4">
+                    <span class="font-mono text-[10px] uppercase tracking-widest text-dispatch-ember mb-3 block">How It Works</span>
+                    <h2 class="font-editorial text-3xl md:text-4xl font-[800] text-paper-50 tracking-tight leading-tight" style="font-variation-settings: 'opsz' 72">
+                        Three steps to<br>absolute clarity.
+                    </h2>
+                    <p class="font-ui text-ink-300 text-sm leading-relaxed mt-4 max-w-sm">
+                        From raw feed to distilled intelligence. Every step is auditable, every output is cited, every process is transparent.
+                    </p>
+                </div>
+
+                <!-- Right column — steps -->
+                <div class="md:col-span-8 space-y-12">
+                    <!-- Step 1: Ingest -->
+                    <div class="flex gap-6 relative">
+                        <span class="font-editorial text-5xl font-[800] text-paper-50/10 shrink-0 leading-none" aria-hidden="true">01</span>
+                        <div>
+                            <h3 class="font-ui text-lg font-semibold text-paper-50 mb-2">Ingest</h3>
+                            <p class="font-ui text-ink-300 leading-relaxed mb-4">
+                                200+ sources polled continuously via RSS, Atom, and JSON API adapters. Every article is normalized, deduplicated by canonical URL and content hash, and routed to its topic cluster. Source health is monitored in real-time; failing feeds trigger automatic backoff and alerting.
+                            </p>
+                            <ul class="font-mono text-[10px] uppercase tracking-widest text-dispatch-slate space-y-1">
+                                <li>&bull; BullMQ v5 scheduler &middot; 5&ndash;30 min intervals</li>
+                                <li>&bull; Zod-validated ingestion pipeline</li>
+                                <li>&bull; Source health monitoring &middot; Auto-retry with exponential backoff</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <hr class="dispatch-rule-ink" aria-hidden="true">
+
+                    <!-- Step 2: Organize -->
+                    <div class="flex gap-6 relative">
+                        <span class="font-editorial text-5xl font-[800] text-paper-50/10 shrink-0 leading-none" aria-hidden="true">02</span>
+                        <div>
+                            <h3 class="font-ui text-lg font-semibold text-paper-50 mb-2">Organize</h3>
+                            <p class="font-ui text-ink-300 leading-relaxed mb-4">
+                                Stories clustered by topic, not outlet. Importance scores computed from recency, source priority, cluster size, and category relevance. BM25-ranked full-text search powered by PostgreSQL 17 GIN indexes. CSS Subgrid ensures perfect visual alignment in the feed.
+                            </p>
+                            <ul class="font-mono text-[10px] uppercase tracking-widest text-dispatch-slate space-y-1">
+                                <li>&bull; 7 categories &middot; 30+ subcategories</li>
+                                <li>&bull; Composite importance scoring algorithm</li>
+                                <li>&bull; BM25 full-text search (Elasticsearch-free)</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <hr class="dispatch-rule-ink" aria-hidden="true">
+
+                    <!-- Step 3: Distill -->
+                    <div class="flex gap-6 relative">
+                        <span class="font-editorial text-5xl font-[800] text-paper-50/10 shrink-0 leading-none" aria-hidden="true">03</span>
+                        <div>
+                            <h3 class="font-ui text-lg font-semibold text-paper-50 mb-2">Distill</h3>
+                            <p class="font-ui text-ink-300 leading-relaxed mb-4">
+                                On-demand AI summaries via Claude 4.5 Haiku with every source cited inline. Full Nutrition Label disclosure: model, temperature, coverage percentage, and verified citations. EU AI Act Article 50 compliant across three machine-readable layers. A permanent escape hatch to the original source is always one click away.
+                            </p>
+                            <ul class="font-mono text-[10px] uppercase tracking-widest text-dispatch-slate space-y-1">
+                                <li>&bull; Claude 4.5 Haiku &middot; GPT-5 Mini fallback</li>
+                                <li>&bull; 87% average content coverage</li>
+                                <li>&bull; &lt;1% factual error rate (audited)</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- 9. TRUST COMMITMENTS — The manifesto                              -->
+    <!--     Anti-generic: No generic "features" grid. Each commitment     -->
+    <!--     is defensible, specific, and backed by architecture.          -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-24 reveal" aria-label="Our commitments">
+        <div class="text-center mb-14">
+            <span class="font-mono text-[10px] uppercase tracking-widest text-dispatch-ember mb-3 block">Commitments</span>
+            <h2 class="font-editorial text-3xl md:text-4xl font-[800] text-ink-900 tracking-tight mb-4" style="font-variation-settings: 'opsz' 72">Built different.<br>By design, not by accident.</h2>
+            <p class="font-ui text-ink-600 max-w-2xl mx-auto">
+                Every architectural choice exists for a documented, tested reason. These are not aspirational values &mdash; they are enforced by code, verified by audit, and visible to you.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Commitment 1 -->
+            <div class="relative border border-paper-200 p-8 reveal">
+                <span class="commitment-number" aria-hidden="true">01</span>
+                <h3 class="font-ui text-lg font-semibold text-ink-900 mb-3">Full AI Transparency</h3>
+                <p class="font-ui text-ink-600 text-sm leading-relaxed mb-4">
+                    Every AI summary includes a Nutrition Label showing exactly what the model did, which sources it used, and what percentage of the original content it analyzed. Three machine-readable layers (JSON-LD, HTTP header, HTML meta) ensure automated compliance verification. This is not a feature &mdash; it is an invariant.
+                </p>
+                <ul class="space-y-2">
+                    <li class="feature-check font-ui text-sm text-ink-600">EU AI Act Article 50 compliant</li>
+                    <li class="feature-check font-ui text-sm text-ink-600">3-layer machine-readable provenance</li>
+                    <li class="feature-check font-ui text-sm text-ink-600">Original source always one click away</li>
+                </ul>
+            </div>
+
+            <!-- Commitment 2 -->
+            <div class="relative border border-paper-200 p-8 reveal reveal-delay-1">
+                <span class="commitment-number" aria-hidden="true">02</span>
+                <h3 class="font-ui text-lg font-semibold text-ink-900 mb-3">Content Availability Guard</h3>
+                <p class="font-ui text-ink-600 text-sm leading-relaxed mb-4">
+                    AI summarisation is only triggered when sufficient content exists. Articles with only a title or short excerpt are never summarised &mdash; doing so would require the AI to fabricate content. The <span class="code-inline">content_availability</span> enum enforces this at the database level.
+                </p>
+                <ul class="space-y-2">
+                    <li class="feature-check font-ui text-sm text-ink-600">4-tier content availability classification</li>
+                    <li class="feature-check font-ui text-sm text-ink-600">Database-enforced summarisation guard</li>
+                    <li class="feature-check font-ui text-sm text-ink-600">Zero fabrication risk by architectural design</li>
+                </ul>
+            </div>
+
+            <!-- Commitment 3 -->
+            <div class="relative border border-paper-200 p-8 reveal">
+                <span class="commitment-number" aria-hidden="true">03</span>
+                <h3 class="font-ui text-lg font-semibold text-ink-900 mb-3">Sub-Second Feed Delivery</h3>
+                <p class="font-ui text-ink-600 text-sm leading-relaxed mb-4">
+                    Cache Components with named profiles deliver a pre-rendered shell in under 800ms FCP. Cursor-based pagination eliminates full-table scans. The feed shell is static; only the article list streams in via Suspense boundaries. This is not caching luck &mdash; it is architectural intention.
+                </p>
+                <ul class="space-y-2">
+                    <li class="feature-check font-ui text-sm text-ink-600">FCP &le;800ms via PPR shell</li>
+                    <li class="feature-check font-ui text-sm text-ink-600">Cursor pagination (no offset drift)</li>
+                    <li class="feature-check font-ui text-sm text-ink-600">Streaming SSR with Suspense boundaries</li>
+                </ul>
+            </div>
+
+            <!-- Commitment 4 -->
+            <div class="relative border border-paper-200 p-8 reveal reveal-delay-1">
+                <span class="commitment-number" aria-hidden="true">04</span>
+                <h3 class="font-ui text-lg font-semibold text-ink-900 mb-3">Enterprise-Grade Reliability</h3>
+                <p class="font-ui text-ink-600 text-sm leading-relaxed mb-4">
+                    BullMQ v5 job queue with priority lanes, dead-letter handling, and real-time monitoring. Source health tracked with failure counts and exponential backoff. Ingestion failures alert within 5 minutes of the third consecutive failure. Every pipeline is observable end-to-end.
+                </p>
+                <ul class="space-y-2">
+                    <li class="feature-check font-ui text-sm text-ink-600">&le;5min failure alerting</li>
+                    <li class="feature-check font-ui text-sm text-ink-600">Exponential backoff for failing sources</li>
+                    <li class="feature-check font-ui text-sm text-ink-600">End-to-end observability (Axiom / Sentry)</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- 10. FAQ — Accordion                                               -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="max-w-3xl mx-auto px-4 sm:px-6 py-16 reveal" aria-label="Frequently asked questions">
+        <div class="text-center mb-12">
+            <span class="font-mono text-[10px] uppercase tracking-widest text-dispatch-ember mb-3 block">FAQ</span>
+            <h2 class="font-editorial text-2xl md:text-3xl font-[800] text-ink-900 tracking-tight" style="font-variation-settings: 'opsz' 72">Questions we get asked.</h2>
+        </div>
+
+        <div class="space-y-0 border-t border-ink-100">
+            <!-- Q1 -->
+            <div class="border-b border-ink-100">
+                <button class="accordion-trigger w-full flex items-center justify-between py-5 text-left font-ui text-base font-medium text-ink-900 hover:text-dispatch-ember transition-colors duration-150" aria-expanded="false">
+                    <span>How does the AI summarisation work?</span>
+                    <svg class="accordion-chevron w-4 h-4 text-ink-300 shrink-0 ml-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div class="accordion-content">
+                    <p class="font-ui text-sm text-ink-600 leading-relaxed pb-5">
+                        When an article has sufficient content (at least a partial body of 300+ characters), our pipeline enqueues a summarisation job. Claude 4.5 Haiku generates a concise summary at temperature 0.1 in factual-only mode, citing specific sources inline. The summary is then verified against a quality pipeline before being published with a full AI Nutrition Label. If Claude is unavailable, GPT-5 Mini serves as a validated fallback.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Q2 -->
+            <div class="border-b border-ink-100">
+                <button class="accordion-trigger w-full flex items-center justify-between py-5 text-left font-ui text-base font-medium text-ink-900 hover:text-dispatch-ember transition-colors duration-150" aria-expanded="false">
+                    <span>Is my data safe?</span>
+                    <svg class="accordion-chevron w-4 h-4 text-ink-300 shrink-0 ml-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div class="accordion-content">
+                    <p class="font-ui text-sm text-ink-600 leading-relaxed pb-5">
+                        Yes. Authentication uses Auth.js v5 with HttpOnly session cookies (SameSite=Strict). Push notification keys are encrypted with AES-256-GCM before storage. We follow OWASP 2025 guidelines across all 10 categories. Input validation is enforced with Zod at every API boundary. The database is PostgreSQL 17 with parameterized queries via Drizzle ORM &mdash; zero raw SQL, zero injection risk.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Q3 -->
+            <div class="border-b border-ink-100">
+                <button class="accordion-trigger w-full flex items-center justify-between py-5 text-left font-ui text-base font-medium text-ink-900 hover:text-dispatch-ember transition-colors duration-150" aria-expanded="false">
+                    <span>What does "topic-first" actually mean?</span>
+                    <svg class="accordion-chevron w-4 h-4 text-ink-300 shrink-0 ml-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div class="accordion-content">
+                    <p class="font-ui text-sm text-ink-600 leading-relaxed pb-5">
+                        Traditional news sites organize by outlet: you visit Reuters for Reuters stories, Bloomberg for Bloomberg stories. OneStopNews organizes by what a story is about. If Reuters, Bloomberg, and AP all cover the same EU regulation, you see them clustered together under "Tech / AI &amp; ML" &mdash; not scattered across three different homepages. This reduces cognitive load and eliminates tab-hopping.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Q4 -->
+            <div class="border-b border-ink-100">
+                <button class="accordion-trigger w-full flex items-center justify-between py-5 text-left font-ui text-base font-medium text-ink-900 hover:text-dispatch-ember transition-colors duration-150" aria-expanded="false">
+                    <span>Can I trust the AI summaries?</span>
+                    <svg class="accordion-chevron w-4 h-4 text-ink-300 shrink-0 ml-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div class="accordion-content">
+                    <p class="font-ui text-sm text-ink-600 leading-relaxed pb-5">
+                        Every summary comes with a Nutrition Label that tells you exactly what the AI did, which model it used, what temperature it ran at, how much of the source text it analyzed, and which specific sources it cited. You can always click through to the original article. Summaries that fail the quality pipeline are flagged for editorial review &mdash; they are never shown to readers without approval. Our audited factual error rate is below 1%.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- 11. EARLY ACCESS CTA — The invitation                              -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section class="bg-ink-900 text-paper-50 py-24" id="early-access">
+        <div class="max-w-3xl mx-auto px-4 sm:px-6 text-center">
+            <span class="font-mono text-[10px] uppercase tracking-widest text-dispatch-ember mb-4 block">Early Access</span>
+            <h2 class="font-editorial text-3xl md:text-5xl font-[800] tracking-tight mb-6" style="font-variation-settings: 'opsz' 72">Join the briefing room.</h2>
+            <p class="font-ui text-ink-300 leading-relaxed mb-10 max-w-xl mx-auto">
+                OneStopNews is in early access. Enter your email to be notified when we open the doors. No spam, no AI-generated newsletters &mdash; just one email when it is ready.
+            </p>
+
+            <form class="flex flex-col sm:flex-row gap-3 max-w-md mx-auto" onsubmit="event.preventDefault(); const btn = this.querySelector('button[type=submit]'); btn.textContent = 'You are on the list.'; btn.disabled = true; btn.classList.add('opacity-60'); this.querySelector('input').disabled = true;">
+                <label for="email-cta" class="sr-only">Email address</label>
+                <input
+                    type="email"
+                    id="email-cta"
+                    name="email"
+                    placeholder="your@email.com"
+                    required
+                    autocomplete="email"
+                    class="cta-input flex-1 font-ui px-4 py-3 rounded-sm"
+                >
+                <button type="submit" class="btn-ember bg-dispatch-ember text-paper-50 font-mono text-[11px] uppercase tracking-widest px-8 py-3 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dispatch-ember focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900">
+                    Request Access
+                </button>
+            </form>
+            <p class="font-mono text-[10px] text-ink-300 mt-4">We respect your privacy. Unsubscribe at any time.</p>
+        </div>
+    </section>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- 12. FOOTER — Editorial, clean, functional                         -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <footer class="bg-paper-50 border-t border-ink-100 py-16">
+        <div class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-8 lg:gap-12 mb-16">
+                <!-- Brand -->
+                <div class="col-span-2 md:col-span-1">
+                    <a href="/" class="font-editorial text-xl font-[800] text-ink-900 tracking-tight mb-4 block hover:text-dispatch-ember transition-colors duration-150">OneStopNews</a>
+                    <p class="font-ui text-sm text-ink-600 leading-relaxed mb-4">
+                        Topic-first news aggregation with source-cited AI summaries. EU AI Act Article 50 compliant.
+                    </p>
+                    <div class="flex items-center gap-2 font-mono text-[10px] text-ink-300">
+                        <span class="block w-1.5 h-1.5 rounded-full bg-dispatch-sage shrink-0" aria-hidden="true"></span>
+                        All systems operational
+                    </div>
+                </div>
+
+                <!-- Product -->
+                <div>
+                    <h4 class="font-mono text-[10px] uppercase tracking-widest text-ink-300 mb-4">Product</h4>
+                    <ul class="space-y-3 font-ui text-sm text-ink-600">
+                        <li><a href="#" class="hover:text-dispatch-ember transition-colors duration-150">Top Stories</a></li>
+                        <li><a href="#" class="hover:text-dispatch-ember transition-colors duration-150">AI Nutrition Label</a></li>
+                        <li><a href="#" class="hover:text-dispatch-ember transition-colors duration-150">Search</a></li>
+                        <li><a href="#" class="hover:text-dispatch-ember transition-colors duration-150">Push Notifications</a></li>
+                        <li><a href="#" class="hover:text-dispatch-ember transition-colors duration-150">Daily Briefing Email</a></li>
+                    </ul>
+                </div>
+
+                <!-- Company -->
+                <div>
+                    <h4 class="font-mono text-[10px] uppercase tracking-widest text-ink-300 mb-4">Company</h4>
+                    <ul class="space-y-3 font-ui text-sm text-ink-600">
+                        <li><a href="#" class="hover:text-dispatch-ember transition-colors duration-150">About</a></li>
+                        <li><a href="#" class="hover:text-dispatch-ember transition-colors duration-150">Blog</a></li>
+                        <li><a href="#" class="hover:text-dispatch-ember transition-colors duration-150">Careers</a></li>
+                        <li><a href="#" class="hover:text-dispatch-ember transition-colors duration-150">Contact</a></li>
+                    </ul>
+                </div>
+
+                <!-- Legal -->
+                <div>
+                    <h4 class="font-mono text-[10px] uppercase tracking-widest text-ink-300 mb-4">Legal</h4>
+                    <ul class="space-y-3 font-ui text-sm text-ink-600">
+                        <li><a href="#" class="hover:text-dispatch-ember transition-colors duration-150">Privacy Policy</a></li>
+                        <li><a href="#" class="hover:text-dispatch-ember transition-colors duration-150">Terms of Service</a></li>
+                        <li><a href="#" class="hover:text-dispatch-ember transition-colors duration-150">AI Governance</a></li>
+                        <li><a href="#" class="hover:text-dispatch-ember transition-colors duration-150">EU AI Act Compliance</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <hr class="dispatch-rule mb-8" aria-hidden="true">
+
+            <!-- Bottom bar -->
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="font-mono text-[10px] uppercase tracking-widest text-ink-300">
+                    &copy; 2026 OneStopNews. All rights reserved.
+                </p>
+                <div class="flex items-center gap-6 font-mono text-[10px] uppercase tracking-widest text-ink-300">
+                    <span>v4.4.0-beta</span>
+                    <span class="flex items-center gap-2">
+                        <span class="block w-1.5 h-1.5 rounded-full bg-dispatch-sage shrink-0" aria-hidden="true"></span>
+                        95% feed freshness
+                    </span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- JAVASCRIPT — Minimal, progressive enhancement only                -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <script>
+        // Initialize Lucide icons
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+
+            // ── Scroll Reveal (Intersection Observer) ──────────────────
+            const revealElements = document.querySelectorAll('.reveal');
+            if (revealElements.length > 0 && 'IntersectionObserver' in window) {
+                const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+                if (prefersReducedMotion) {
+                    // If reduced motion, show everything immediately
+                    revealElements.forEach(function(el) {
+                        el.classList.add('visible');
+                    });
+                } else {
+                    const revealObserver = new IntersectionObserver(function(entries) {
+                        entries.forEach(function(entry) {
+                            if (entry.isIntersecting) {
+                                entry.target.classList.add('visible');
+                                revealObserver.unobserve(entry.target);
+                            }
+                        });
+                    }, {
+                        threshold: 0.1,
+                        rootMargin: '0px 0px -40px 0px'
+                    });
+
+                    revealElements.forEach(function(el) {
+                        revealObserver.observe(el);
+                    });
+                }
+            }
+
+            // ── Confidence Bar Animation ──────────────────────────────
+            const confidenceFill = document.getElementById('confidenceFill');
+            if (confidenceFill && 'IntersectionObserver' in window) {
+                const confidenceObserver = new IntersectionObserver(function(entries) {
+                    entries.forEach(function(entry) {
+                        if (entry.isIntersecting) {
+                            confidenceFill.classList.add('animate');
+                            confidenceObserver.unobserve(entry.target);
+                        }
+                    });
+                }, { threshold: 0.3 });
+                confidenceObserver.observe(confidenceFill.parentElement);
+            }
+
+            // ── Accordion ─────────────────────────────────────────────
+            document.querySelectorAll('.accordion-trigger').forEach(function(trigger) {
+                trigger.addEventListener('click', function() {
+                    const content = this.nextElementSibling;
+                    const chevron = this.querySelector('.accordion-chevron');
+                    const isOpen = content.classList.contains('open');
+
+                    // Close all others
+                    document.querySelectorAll('.accordion-content.open').forEach(function(openContent) {
+                        openContent.classList.remove('open');
+                        openContent.previousElementSibling.querySelector('.accordion-chevron').classList.remove('open');
+                        openContent.previousElementSibling.setAttribute('aria-expanded', 'false');
+                    });
+
+                    if (!isOpen) {
+                        content.classList.add('open');
+                        chevron.classList.add('open');
+                        this.setAttribute('aria-expanded', 'true');
+                    }
+                });
+            });
+
+            // ── Sort Buttons ──────────────────────────────────────────
+            document.querySelectorAll('.sort-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    this.parentElement.querySelectorAll('.sort-btn').forEach(function(b) {
+                        b.classList.remove('active');
+                    });
+                    this.classList.add('active');
+                });
+            });
+
+            // ── Category Nav Tabs ─────────────────────────────────────
+            document.querySelectorAll('[role="tablist"] button[role="tab"]').forEach(function(tab) {
+                tab.addEventListener('click', function() {
+                    this.closest('[role="tablist"]').querySelectorAll('[role="tab"]').forEach(function(t) {
+                        t.setAttribute('aria-selected', 'false');
+                        t.classList.remove('border-dispatch-ember', 'text-ink-900', 'bg-dispatch-ember-light/40');
+                        t.classList.add('border-transparent', 'text-ink-600');
+                    });
+                    this.setAttribute('aria-selected', 'true');
+                    this.classList.remove('border-transparent', 'text-ink-600');
+                    this.classList.add('border-dispatch-ember', 'text-ink-900', 'bg-dispatch-ember-light/40');
+                });
+            });
+        });
+    </script>
+</body>
+</html>

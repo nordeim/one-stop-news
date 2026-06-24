@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+
+  <title>
+    OneStopNews — Stop Reading The Same Story Five Times
+  </title>
+
+  <meta
+    name="description"
+    content="OneStopNews organizes coverage into living story clusters so you can understand what happened before deciding what to read."
+  />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,700;6..72,800&display=swap"
+    rel="stylesheet"
+  />
+
+  <link rel="stylesheet" href="./landing.css" />
+</head>
+
+<body>
+  <div class="page-shell">
+
+    <!-- ====================================== -->
+    <!-- HEADER                                 -->
+    <!-- ====================================== -->
+
+    <header class="site-header">
+      <div class="brand">
+        <div class="brand-mark">OSN</div>
+
+        <div>
+          <strong>OneStopNews</strong>
+          <span>Everything important, sorted by topic.</span>
+        </div>
+      </div>
+
+      <nav class="main-nav">
+        <a href="#clusters">Story Clusters</a>
+        <a href="#topics">Topics</a>
+        <a href="#ai">AI Summaries</a>
+        <a href="#trust">Trust</a>
+      </nav>
+
+      <a class="header-cta" href="#cta">
+        Start Reading
+      </a>
+    </header>
+
+    <main>
+
+      <!-- ====================================== -->
+      <!-- HERO                                  -->
+      <!-- ====================================== -->
+
+      <section class="hero section">
+        <div class="hero-copy">
+          <div class="eyebrow">
+            Editorial Intelligence
+          </div>
+
+          <h1>
+            Stop reading
+            the same story
+            five times.
+          </h1>
+
+          <p class="hero-description">
+            OneStopNews groups reporting from hundreds of
+            publishers into living story clusters so you can
+            understand what happened before deciding what
+            deserves your attention.
+          </p>
+
+          <div class="hero-actions">
+            <a href="#clusters" class="button-primary">
+              Explore Story Clusters
+            </a>
+
+            <a href="#preview" class="button-secondary">
+              Preview The Product
+            </a>
+          </div>
+        </div>
+
+        <div class="hero-stat-block">
+          <div class="hero-stat">
+            <strong data-counter="8000">0</strong>
+            <span>Articles Indexed Daily</span>
+          </div>
+
+          <div class="hero-stat">
+            <strong data-counter="250">0</strong>
+            <span>News Sources</span>
+          </div>
+
+          <div class="hero-stat">
+            <strong data-counter="42">0</strong>
+            <span>Active Topics</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================== -->
+      <!-- STORY CLUSTER WALL                     -->
+      <!-- ====================================== -->
+
+      <section
+        id="clusters"
+        class="story-wall section reveal"
+      >
+        <div class="section-heading">
+          <div class="eyebrow">Story Clusters</div>
+
+          <h2>
+            One event.
+            Many perspectives.
+          </h2>
+
+          <p>
+            Traditional news readers show every article.
+            OneStopNews shows the story.
+          </p>
+        </div>
+
+        <div class="cluster-stage">
+
+          <div class="publisher-column">
+
+            <div class="publisher-node">
+              Reuters
+            </div>
+
+            <div class="publisher-node">
+              Bloomberg
+            </div>
+
+            <div class="publisher-node">
+              CNBC
+            </div>
+
+            <div class="publisher-node">
+              BBC
+            </div>
+
+            <div class="publisher-node">
+              The Verge
+            </div>
+
+          </div>
+
+          <div class="cluster-core">
+
+            <div class="cluster-ring"></div>
+
+            <div class="cluster-card">
+
+              <div class="cluster-label">
+                Live Story Cluster
+              </div>
+
+              <h3 id="clusterTitle">
+                Apple Expands AI Strategy
+              </h3>
+
+              <div class="cluster-metrics">
+                <span>32 Sources</span>
+                <span>147 Articles</span>
+                <span>High Impact</span>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="cluster-insights">
+
+            <div class="insight-card">
+              New AI products announced
+            </div>
+
+            <div class="insight-card">
+              Enterprise rollout expands
+            </div>
+
+            <div class="insight-card">
+              Developer ecosystem grows
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ====================================== -->
+      <!-- PROCESS                               -->
+      <!-- ====================================== -->
+
+      <section class="process section reveal">
+
+        <div class="section-heading">
+          <div class="eyebrow">
+            How It Works
+          </div>
+
+          <h2>
+            Built for understanding.
+          </h2>
+        </div>
+
+        <div class="process-grid">
+
+          <article class="process-card">
+            <span>01</span>
+
+            <h3>Collect</h3>
+
+            <p>
+              Thousands of articles arrive from trusted
+              publishers every day.
+            </p>
+          </article>
+
+          <article class="process-card">
+            <span>02</span>
+
+            <h3>Cluster</h3>
+
+            <p>
+              Related coverage is grouped into a single
+              evolving story.
+            </p>
+          </article>
+
+          <article class="process-card">
+            <span>03</span>
+
+            <h3>Compress</h3>
+
+            <p>
+              Optional AI summaries help you understand
+              developments in seconds.
+            </p>
+          </article>
+
+        </div>
+      </section>
+
+      <!-- ====================================== -->
+      <!-- COMPARISON                            -->
+      <!-- ====================================== -->
+
+      <section class="comparison section reveal">
+
+        <div class="comparison-column">
+
+          <div class="comparison-label">
+            Traditional News
+          </div>
+
+          <div class="headline-stack">
+            Apple Announces AI Platform
+          </div>
+
+          <div class="headline-stack">
+            Apple Reveals AI Features
+          </div>
+
+          <div class="headline-stack">
+            Apple Expands AI Roadmap
+          </div>
+
+          <div class="headline-stack">
+            Apple Launches New AI Tools
+          </div>
+
+        </div>
+
+        <div class="comparison-divider">
+          →
+        </div>
+
+        <div class="comparison-column optimized">
+
+          <div class="comparison-label">
+            OneStopNews
+          </div>
+
+          <div class="story-node">
+            APPLE AI STRATEGY
+          </div>
+
+          <p>
+            One cluster.
+            Multiple perspectives.
+            Faster understanding.
+          </p>
+
+        </div>
+
+      </section>
+
+      <!-- ====================================== -->
+      <!-- TOPICS                                -->
+      <!-- ====================================== -->
+
+      <section
+        id="topics"
+        class="topics section reveal"
+      >
+
+        <div class="section-heading">
+          <div class="eyebrow">
+            Topic Universe
+          </div>
+
+          <h2>
+            Browse by what matters.
+          </h2>
+        </div>
+
+        <div class="topic-cloud">
+
+          <button
+            class="topic-word"
+            data-count="2342"
+          >
+            TECH
+          </button>
+
+          <button
+            class="topic-word"
+            data-count="1780"
+          >
+            FINANCE
+          </button>
+
+          <button
+            class="topic-word"
+            data-count="1291"
+          >
+            GLOBAL
+          </button>
+
+          <button
+            class="topic-word"
+            data-count="985"
+          >
+            POLITICS
+          </button>
+
+          <button
+            class="topic-word"
+            data-count="744"
+          >
+            CULTURE
+          </button>
+
+        </div>
+
+        <div id="topicInfo" class="topic-info">
+          Hover a topic to explore active coverage.
+        </div>
+
+      </section>
+
+      <!-- ====================================== -->
+      <!-- AI                                    -->
+      <!-- ====================================== -->
+
+      <section
+        id="ai"
+        class="ai-section section reveal"
+      >
+
+        <div class="section-heading">
+          <div class="eyebrow">
+            AI Summaries
+          </div>
+
+          <h2>
+            AI when you need it.
+            Not when you don't.
+          </h2>
+        </div>
+
+        <div class="ai-grid">
+
+          <div class="ai-panel">
+            <h3>Original Source</h3>
+
+            <p>
+              Reuters reports Apple expanded its
+              enterprise AI roadmap and announced
+              new developer APIs.
+            </p>
+          </div>
+
+          <div class="ai-panel summary">
+            <h3>AI Summary</h3>
+
+            <ul>
+              <li>Enterprise AI rollout expands.</li>
+              <li>Developer ecosystem grows.</li>
+              <li>New competitive pressure emerges.</li>
+            </ul>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- ====================================== -->
+      <!-- PRODUCT PREVIEW                       -->
+      <!-- ====================================== -->
+
+      <section
+        id="preview"
+        class="preview section reveal"
+      >
+
+        <div class="section-heading">
+          <div class="eyebrow">
+            Product Preview
+          </div>
+
+          <h2>
+            Calm.
+            Dense.
+            Topic-first.
+          </h2>
+        </div>
+
+        <div class="app-preview">
+
+          <aside class="preview-nav">
+            <span>TOP</span>
+            <span>TECH</span>
+            <span>FINANCE</span>
+            <span>GLOBAL</span>
+            <span>POLITICS</span>
+          </aside>
+
+          <div class="preview-feed">
+
+            <div class="preview-cluster">
+              <strong>
+                Apple AI Strategy
+              </strong>
+
+              <span>
+                147 articles · 32 sources
+              </span>
+            </div>
+
+            <div class="preview-cluster">
+              <strong>
+                Nvidia Earnings
+              </strong>
+
+              <span>
+                89 articles · 21 sources
+              </span>
+            </div>
+
+            <div class="preview-cluster">
+              <strong>
+                Global Markets
+              </strong>
+
+              <span>
+                56 articles · 18 sources
+              </span>
+            </div>
+
+          </div>
+
+          <aside class="preview-detail">
+
+            <h4>
+              AI Summary
+            </h4>
+
+            <p>
+              Key developments summarized while
+              preserving direct access to publishers.
+            </p>
+
+          </aside>
+
+        </div>
+
+      </section>
+
+      <!-- ====================================== -->
+      <!-- TRUST                                 -->
+      <!-- ====================================== -->
+
+      <section
+        id="trust"
+        class="trust section reveal"
+      >
+
+        <div class="section-heading">
+          <div class="eyebrow">
+            Trust & Transparency
+          </div>
+
+          <h2>
+            Built for understanding.
+            Not engagement farming.
+          </h2>
+        </div>
+
+        <div class="trust-grid">
+
+          <article>
+            Sources Always Visible
+          </article>
+
+          <article>
+            AI Clearly Labeled
+          </article>
+
+          <article>
+            Publisher First
+          </article>
+
+          <article>
+            No AI Written News
+          </article>
+
+        </div>
+
+      </section>
+
+      <!-- ====================================== -->
+      <!-- CTA                                   -->
+      <!-- ====================================== -->
+
+      <section
+        id="cta"
+        class="cta section reveal"
+      >
+
+        <div class="eyebrow">
+          OneStopNews
+        </div>
+
+        <h2>
+          The news
+          should make sense.
+        </h2>
+
+        <p>
+          Everything important.
+          Sorted by topic.
+        </p>
+
+        <a href="#" class="button-primary">
+          Start Reading
+        </a>
+
+      </section>
+
+    </main>
+
+    <footer class="site-footer">
+      <span>
+        OneStopNews
+      </span>
+
+      <span>
+        Topic-first news intelligence.
+      </span>
+    </footer>
+
+  </div>
+
+  <script src="./landing.js"></script>
+</body>
+</html>

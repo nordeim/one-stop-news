@@ -1,0 +1,537 @@
+$ cd /home/project && git clone https://github.com/nordeim/onestopnews.git 2>&1 | tail -20
+Cloning into 'onestopnews'...
+$ wc -l /home/project/onestopnews/AGENTS.md /home/project/onestopnews/README.md /home/project/onestopnews/MASTER_EXECUTION_PLAN.md /home/project/onestopnews/validation_outstanding_gaps_post_remediation.md
+  1487 /home/project/onestopnews/AGENTS.md
+  1432 /home/project/onestopnews/README.md
+  1294 /home/project/onestopnews/MASTER_EXECUTION_PLAN.md
+   951 /home/project/onestopnews/validation_outstanding_gaps_post_remediation.md
+  5164 total
+$ cd /home/project/onestopnews && cat drizzle/0004_smiling_newton_destine.sql 2>&1; echo "---"; cat drizzle/0003_strong_mac_gargan.sql 2>&1 | head -30
+ALTER TABLE "push_subscriptions" ALTER COLUMN "keys" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "push_subscriptions" ADD COLUMN "encrypted_keys" text;---
+ALTER TABLE "articles" ADD COLUMN "body" text;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN "email_verified" timestamp;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN "image" text;
+$ cd /home/project/onestopnews && ls .github/workflows/ 2>&1; echo "---"; cat vitest.config.ts 2>&1; echo "---"; cat eslint.config.mjs 2>&1
+ci.yml
+e2e.yml
+---
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  test: {
+    environment: "jsdom",
+    globals: true,
+    // Exclude Playwright E2E tests from vitest (they use @playwright/test, not vitest)
+    exclude: [
+      "node_modules/",
+      "dist/",
+      "backup/",
+      "plans/",
+      "e2e/**",
+      "playwright.config.ts",
+    ],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json", "html"],
+      thresholds: {
+        lines: 80,
+        functions: 80,
+        branches: 70,
+        statements: 80,
+      },
+      exclude: [
+        "node_modules/",
+        "dist/",
+        "*.config.*",
+        "*.d.ts",
+        "src/test/**",
+        "e2e/**",
+      ],
+    },
+    setupFiles: ["./src/test/setup.ts"],
+  },
+  resolve: {
+    alias: {
+      "@": new URL("./src", import.meta.url).pathname,
+    },
+  },
+});
+---
+import tseslint from "typescript-eslint";
+
+/** @type {import('eslint').Linter.Config[]} */
+export default [
+  {
+    ignores: [".next/**", "node_modules/**", "drizzle/**", "dist/**", "e2e/**", "playwright.config.ts"],
+  },
+  {
+    files: ["**/*.ts", "**/*.tsx"],
+    languageOptions: {
+      parser: tseslint.parser,
+    },
+    plugins: {
+      "@typescript-eslint": tseslint.plugin,
+    },
+    rules: {
+      "@typescript-eslint/no-unused-vars": "error",
+      "@typescript-eslint/no-explicit-any": "warn",
+    },
+  },
+];
+$ cd /home/project/onestopnews && ls playwright.config.ts e2e/ 2>&1; echo "---"; head -30 e2e/smoke.spec.ts 2>&1; echo "---"; head -30 playwright.config.ts 2>&1
+playwright.config.ts
+
+e2e/:
+smoke.spec.ts
+---
+/**
+ * smoke.spec.ts — Basic E2E smoke tests for OneStopNews.
+ *
+ * Phase 14 (MEDIUM-4): Establishes E2E test coverage.
+ * These tests verify the core user journeys work end-to-end:
+ *   1. Homepage loads with feed
+ *   2. Article detail page loads
+ *   3. Search page loads
+ *   4. Category navigation works
+ *
+ * Prerequisites: `pnpm dev` must be running (or use webServer config
+ * in playwright.config.ts which auto-starts it).
+ */
+
+import { test, expect } from "@playwright/test";
+
+test.describe("Homepage", () => {
+  test("loads with correct title and visible content", async ({ page }) => {
+    await page.goto("/");
+
+    // Verify the page title
+    await expect(page).toHaveTitle(/OneStopNews/i);
+
+    // Verify the wordmark is visible
+    await expect(page.locator("text=OneStopNews").first()).toBeVisible();
+  });
+
+  test("displays the masthead with live badge", async ({ page }) => {
+    await page.goto("/");
+
+---
+/**
+ * playwright.config.ts — Playwright E2E test configuration.
+ *
+ * Phase 14 (MEDIUM-4): Establishes E2E test infrastructure.
+ * Tests run against a local dev server (pnpm dev) on http://localhost:3000.
+ *
+ * Run with: pnpm test:e2e
+ * (Requires `pnpm dev` to be running in a separate terminal, OR use
+ * the `webServer` config below to auto-start the dev server.)
+ */
+
+import { defineConfig, devices } from "@playwright/test";
+
+export default defineConfig({
+  // Test directory
+  testDir: "./e2e",
+
+  // Test files match this pattern
+  testMatch: "*.spec.ts",
+
+  // Fail the build on CI if you accidentally left test.only in the source code
+  forbidOnly: !!process.env.CI,
+
+  // Retry on CI only
+  retries: process.env.CI ? 2 : 0,
+
+  // Opt out of parallel tests on CI (resources are limited)
+  workers: process.env.CI ? 1 : undefined,
+
+  // Reporter
+$ cd /home/project/onestopnews && ls -la src/features/ src/lib/ src/workers/ src/domain/ src/shared/ 2>&1
+src/domain/:
+total 16
+drwxrwxr-x  4 z z 4096 Jun 18 18:26 .
+drwxrwxr-x 10 z z 4096 Jun 18 18:26 ..
+drwxrwxr-x  2 z z 4096 Jun 18 18:26 articles
+drwxrwxr-x  2 z z 4096 Jun 18 18:26 ranking
+
+src/features/:
+total 28
+drwxrwxr-x  7 z z 4096 Jun 18 18:26 .
+drwxrwxr-x 10 z z 4096 Jun 18 18:26 ..
+drwxrwxr-x  3 z z 4096 Jun 18 18:26 articles
+drwxrwxr-x  3 z z 4096 Jun 18 18:26 feed
+drwxrwxr-x  3 z z 4096 Jun 18 18:26 search
+drwxrwxr-x  3 z z 4096 Jun 18 18:26 sources
+drwxrwxr-x  4 z z 4096 Jun 18 18:26 summaries
+
+src/lib/:
+total 40
+drwxrwxr-x  8 z z 4096 Jun 18 18:26 .
+drwxrwxr-x 10 z z 4096 Jun 18 18:26 ..
+drwxrwxr-x  2 z z 4096 Jun 18 18:26 ai
+drwxrwxr-x  2 z z 4096 Jun 18 18:26 auth
+drwxrwxr-x  2 z z 4096 Jun 18 18:26 db
+drwxrwxr-x  2 z z 4096 Jun 18 18:26 env
+drwxrwxr-x  2 z z 4096 Jun 18 18:26 queue
+-rw-rw-r--  1 z z 3663 Jun 18 18:26 rateLimit.test.ts
+-rw-rw-r--  1 z z 2644 Jun 18 18:26 rateLimit.ts
+drwxrwxr-x  2 z z 4096 Jun 18 18:26 security
+
+src/shared/:
+total 20
+drwxrwxr-x  5 z z 4096 Jun 18 18:26 .
+drwxrwxr-x 10 z z 4096 Jun 18 18:26 ..
+drwxrwxr-x  5 z z 4096 Jun 18 18:26 components
+drwxrwxr-x  2 z z 4096 Jun 18 18:26 hooks
+drwxrwxr-x  2 z z 4096 Jun 18 18:26 lib
+
+src/workers/:
+total 48
+drwxrwxr-x  5 z z  4096 Jun 18 18:26 .
+drwxrwxr-x 10 z z  4096 Jun 18 18:26 ..
+-rw-rw-r--  1 z z 14153 Jun 18 18:26 index.ts
+drwxrwxr-x  2 z z  4096 Jun 18 18:26 jobs
+drwxrwxr-x  2 z z  4096 Jun 18 18:26 lib
+-rw-rw-r--  1 z z  8876 Jun 18 18:26 pipeline.integration.test.ts
+drwxrwxr-x  2 z z  4096 Jun 18 18:26 push
+$ cd /home/project/onestopnews && ls src/app/ src/app/api/ src/app/\(admin\)/ src/app/\(public\)/ src/app/article/ 2>&1
+src/app/:
+(admin)
+(public)
+api
+article
+globals.css
+layout.tsx
+topics
+
+src/app/(admin)/:
+layout.tsx
+sources
+summaries
+
+src/app/(public)/:
+page.test.tsx
+page.tsx
+search
+
+src/app/api/:
+admin
+articles
+auth
+categories
+health
+push
+summarize
+
+src/app/article/:
+[id]
+$ cd /home/project/onestopnews && find src -name "*.test.ts" -o -name "*.test.tsx" 2>&1 | wc -l; echo "---"; find src -name "*.test.ts" -o -name "*.test.tsx" 2>&1 | head -30
+45
+---
+src/features/summaries/lib/summariseSchema.test.ts
+src/features/summaries/components/SummaryPanel.test.tsx
+src/features/summaries/components/NutritionLabel.test.tsx
+src/features/summaries/components/NutritionLabelDemo.test.tsx
+src/features/summaries/components/DisclosureBadge.test.tsx
+src/features/articles/components/ArticleData.test.tsx
+src/features/articles/queries.test.ts
+src/features/feed/components/FeedGrid.test.tsx
+src/features/feed/components/LeadStory.test.tsx
+src/features/feed/queries.test.ts
+src/features/search/queries.test.ts
+src/lib/security/encrypt.test.ts
+src/lib/queue/flows.test.ts
+src/lib/db/seed.test.ts
+src/lib/db/index.test.ts
+src/lib/ai/provenance.test.ts
+src/lib/rateLimit.test.ts
+src/components/primitives/PageTransition.test.tsx
+src/domain/articles/normalize.test.ts
+src/domain/articles/types.test.ts
+src/domain/ranking/score.test.ts
+src/app/(public)/page.test.tsx
+src/app/(public)/search/SearchPageClient.test.tsx
+src/app/api/articles/route.test.ts
+src/app/api/categories/route.test.ts
+src/app/api/push/subscribe/route.test.ts
+src/workers/lib/cacheInvalidation.test.ts
+src/workers/jobs/summarizeFailure.test.ts
+src/workers/jobs/determineContentAvailability.test.ts
+src/workers/jobs/parseFeed.test.ts
+$ cd /home/project/onestopnews && pnpm install --frozen-lockfile --prefer-offline 2>&1 | tail -15
+/bin/bash: line 1: pnpm: command not found
+$ which node npm npx 2>&1; node --version 2>&1; npm --version 2>&1
+/usr/bin/node
+/usr/bin/npm
+/usr/bin/npx
+v24.16.0
+11.13.0
+$ cd /home/project/onestopnews && npm install --no-audit --no-fund 2>&1 | tail -20
+npm warn deprecated @esbuild-kit/esm-loader@2.6.5: Merged into tsx: https://tsx.is
+npm warn deprecated @esbuild-kit/core-utils@3.3.2: Merged into tsx: https://tsx.is
+npm warn deprecated @types/bcryptjs@3.0.0: This is a stub types definition. bcryptjs provides its own type definitions, so you do not need this installed.
+
+added 369 packages in 48s
+$ cd /home/project/onestopnews && npx vitest run 2>&1 | tail -80
+stdout | src/components/primitives/PageTransition.test.tsx
+Test suite starting...
+
+stdout | src/components/primitives/PageTransition.test.tsx
+Test suite complete.
+
+ ✓ src/components/primitives/PageTransition.test.tsx (2 tests) 31ms
+stdout | src/features/feed/components/LeadStory.test.tsx
+Test suite starting...
+
+stdout | src/features/feed/components/LeadStory.test.tsx
+Test suite complete.
+
+ ✓ src/features/feed/components/LeadStory.test.tsx (4 tests) 65ms
+stdout | src/shared/components/ui/StatsSection.test.tsx
+Test suite starting...
+
+stdout | src/shared/components/ui/StatsSection.test.tsx
+Test suite complete.
+
+ ✓ src/shared/components/ui/StatsSection.test.tsx (3 tests) 136ms
+stdout | src/features/summaries/components/NutritionLabelDemo.test.tsx
+Test suite starting...
+
+stdout | src/features/summaries/components/NutritionLabelDemo.test.tsx
+Test suite complete.
+
+ ✓ src/features/summaries/components/NutritionLabelDemo.test.tsx (3 tests) 42ms
+stdout | src/shared/components/ui/Accordion.test.tsx
+Test suite starting...
+
+stdout | src/shared/components/ui/Accordion.test.tsx
+Test suite complete.
+
+ ✓ src/shared/components/ui/Accordion.test.tsx (2 tests) 151ms
+stdout | src/shared/components/ui/NewsletterCTA.test.tsx
+Test suite starting...
+
+stdout | src/shared/components/ui/NewsletterCTA.test.tsx
+Test suite complete.
+
+ ✓ src/shared/components/ui/NewsletterCTA.test.tsx (3 tests) 37ms
+stdout | src/app/(public)/search/SearchPageClient.test.tsx
+Test suite starting...
+
+stdout | src/app/(public)/search/SearchPageClient.test.tsx
+Test suite complete.
+
+ ✓ src/app/(public)/search/SearchPageClient.test.tsx (1 test) 4ms
+stdout | src/app/(public)/page.test.tsx
+Test suite starting...
+
+stderr | src/app/(public)/page.test.tsx > HomePage > renders without errors
+<FeedData> is an async Client Component. Only Server Components can be async at the moment. This error is often caused by accidentally adding `'use client'` to a module that was originally written for the server.
+
+stderr | src/app/(public)/page.test.tsx > HomePage > renders without errors
+A suspended resource finished loading inside a test, but the event was not wrapped in act(...).
+
+When testing, code that resolves suspended data should be wrapped into act(...):
+
+act(() => {
+  /* finish loading suspended data */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+A component suspended inside an `act` scope, but the `act` call was not awaited. When testing React components that depend on asynchronous data, you must await the result:
+
+await act(() => ...)
+
+stdout | src/app/(public)/page.test.tsx
+Test suite complete.
+
+ ✓ src/app/(public)/page.test.tsx (1 test) 166ms
+
+ Test Files  45 passed (45)
+      Tests  251 passed (251)
+   Start at  18:32:54
+   Duration  12.18s (transform 708ms, setup 356ms, import 4.86s, tests 2.82s, environment 21.71s)
+$ cd /home/project/onestopnews && npx tsc --noEmit 2>&1 | tail -30; echo "EXIT: $?"
+EXIT: 0
+$ cd /home/project/onestopnews && npx eslint . --max-warnings 0 2>&1 | tail -30; echo "EXIT: $?"
+$ cd /home/project/onestopnews && cat .github/workflows/ci.yml 2>&1 | head -80; echo "---"; cat .github/workflows/e2e.yml 2>&1 | head -50
+name: CI Pipeline
+
+on:
+  push:
+    branches: ain]
+  pull_request:
+    branches: ain]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run Linter
+        run: pnpm run lint
+      - name: Run Unit Tests
+        run: pnpm run test
+      - name: Run TypeScript Check
+        run: pnpm run check
+      - name: Build
+        run: pnpm run build
+    env:
+      # All env vars required by src/lib/env/index.ts must be present at
+      # module load time, even for lint/test/build steps. Use CI-safe dummy
+      # values — these never touch real external services.
+      DATABASE_URL: "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
+      REDIS_URL: "redis://localhost:6379"
+      AUTH_SECRET: "ci-dummy-secret-at-least-32-characters-long-xxx"
+      AUTH_URL: "http://localhost:3000"
+      ANTHROPIC_API_KEY: "sk-ant-ci-dummy-key-not-real"
+      OPENAI_API_KEY: "sk-ci-dummy-key-not-real"
+      NEXT_PUBLIC_VAPID_PUBLIC_KEY: "ci-dummy-vapid-public-key-not-real"
+      VAPID_PRIVATE_KEY: "ci-dummy-vapid-private-key-not-real"
+      VAPID_SUBJECT: "mailto:ci@onestopnews.com"
+      PUSH_KEY_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      NODE_ENV: "test"
+---
+name: E2E Tests
+
+on:
+  push:
+    branches: ain]
+  pull_request:
+    branches: ain]
+
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+      - name: Run E2E Tests
+        run: pnpm run test:e2e
+$ cd /home/project/onestopnews && sed -n '1,10p' .github/workflows/ci.yml | cat -A 2>&1 | head -20
+name: CI Pipeline$
+$
+on:$
+  push:$
+    branches: ain]$
+  pull_request:$
+    branches: ain]$
+$
+jobs:$
+  lint-and-test:$
+$ cd /home/project/onestopnews && python3 -c "import yaml; y = yaml.safe_load(open('.github/workflows/ci.yml').read()); print(repr(y['on']))" 2>&1
+Command failed with exit_code=1, duration_ms=102.
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+KeyError: 'on'
+$ cd /home/project/onestopnews && python3 -c "import yaml; y = yaml.safe_load(open('.github/workflows/ci.yml').read()); print(list(y.keys()))" 2>&1
+['name', True, 'jobs']
+$ cd /home/project/onestopnews && python3 -c "import yaml; y = yaml.safe_load(open('.github/workflows/ci.yml').read()); import json; print(json.dumps(y[True], indent=2))" 2>&1
+$ cd /home/project/onestopnews && sed -n '5p' .github/workflows/ci.yml | od -c 2>&1 | head -5
+0000000                   b   r   a   n   c   h   e   s   :       [   m
+0000020   a   i   n   ]  \n
+0000025
+$ cd /home/project/onestopnews && ls src/shared/components/ui/ src/shared/components/layout/ src/shared/components/providers/ 2>&1; echo "---"; ls src/features/summaries/components/ 2>&1; echo "---"; ls src/features/feed/components/ 2>&1; echo "---"; ls src/features/articles/components/ 2>&1
+src/shared/components/layout/:
+Footer.test.tsx
+Footer.tsx
+Header.test.tsx
+Header.tsx
+Masthead.test.tsx
+Masthead.tsx
+NewsTicker.test.tsx
+NewsTicker.tsx
+
+src/shared/components/providers/:
+RevealProvider.test.tsx
+RevealProvider.tsx
+
+src/shared/components/ui/:
+Accordion.test.tsx
+Accordion.tsx
+Badge.tsx
+Button.test.tsx
+Button.tsx
+NewsletterCTA.test.tsx
+NewsletterCTA.tsx
+Skeleton.tsx
+StatsSection.test.tsx
+StatsSection.tsx
+---
+DisclosureBadge.test.tsx
+DisclosureBadge.tsx
+NutritionLabel.test.tsx
+NutritionLabel.tsx
+NutritionLabelDemo.test.tsx
+NutritionLabelDemo.tsx
+SummariesData.tsx
+SummariesSkeleton.tsx
+SummaryPanel.test.tsx
+SummaryPanel.tsx
+---
+ArticleCard.tsx
+FeedData.tsx
+FeedGrid.test.tsx
+FeedGrid.tsx
+FeedSkeleton.tsx
+LeadStory.test.tsx
+LeadStory.tsx
+---
+ArticleData.test.tsx
+ArticleData.tsx
+ArticleSkeleton.tsx
+$ cd /home/project/onestopnews && ls "src/app/article/[id]/" 2>&1; echo "---"; ls src/app/topics/ 2>&1; echo "---"; ls "src/app/topics/[category]/" 2>&1; echo "---"; ls src/app/api/auth/ 2>&1
+page.tsx
+---
+[category]
+---
+page.tsx
+---
+[[...nextauth]]
+$ 

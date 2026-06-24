@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OneStopNews — Live AI News Aggregator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Newsreader:opsz,wght@6..72,550;6..72,700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <main class="workspace">
+        <header class="site-header">
+          <div class="brand">
+            <div class="brand-mark">OSN</div>
+            <div>
+              <strong>OneStopNews</strong>
+              <span>Everything important, sorted by topic</span>
+            </div>
+          </div>
+          <div class="status-pills" id="statusPills">
+            <span>Loading sources...</span>
+          </div>
+        </header>
+
+        <section class="hero">
+          <div>
+            <p class="eyebrow">Live Brief</p>
+            <h1>Major stories, grouped by what they are about.</h1>
+          </div>
+          <div class="hero-actions">
+            <label class="search">
+              <span>Search</span>
+              <input id="searchInput" type="search" placeholder="Apple, Singapore, China, markets..." />
+            </label>
+            <button class="refresh-button" id="refreshButton" type="button">Refresh live feeds</button>
+          </div>
+        </section>
+
+        <nav class="topic-nav" id="topicNav" aria-label="Topic navigation"></nav>
+
+        <section class="controls-panel">
+          <div>
+            <div class="section-label">Current view</div>
+            <div class="active-category" id="activeCategory">Top Stories</div>
+            <div class="result-count" id="resultCount">Loading articles...</div>
+          </div>
+          <div class="field">
+            <label for="subcategorySelect">Subcategory</label>
+            <select id="subcategorySelect"></select>
+          </div>
+          <div class="field">
+            <label for="sortSelect">Sort</label>
+            <select id="sortSelect">
+              <option value="latest">Latest</option>
+              <option value="impact">Highest impact</option>
+              <option value="summary">Summary ready</option>
+            </select>
+          </div>
+        </section>
+
+        <section class="feed-layout">
+          <div class="lead-card" id="leadCard"></div>
+          <div class="article-grid" id="articleGrid"></div>
+        </section>
+      </main>
+
+      <aside class="detail-panel" id="detailPanel" aria-label="Selected article"></aside>
+    </div>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
