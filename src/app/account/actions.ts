@@ -22,7 +22,7 @@
  *   - The `accounts.userId` is taken from the session, never from user input.
  */
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { accounts } from "@/lib/db/schema";
 import { verifySession } from "@/lib/auth/dal";
@@ -83,11 +83,26 @@ export async function linkOAuthProvider(provider: string): Promise<LinkResult> {
   const typedProvider = provider as OAuthProvider;
 
   try {
-    // Check if this provider is already linked to this user
+    // Phase 24 / F3 fix: Query by (userId, provider) tuple — NOT by provider
+    // alone. The original code queried `eq(accounts.provider, typedProvider)`
+    // and then did a post-hoc `existing.userId === user.id` check. This had
+    // two bugs:
+    //   1. The query returned ANY user's row matching the provider, wasting
+    //      a round-trip and leaking account existence to other users.
+    //   2. Race condition: two concurrent calls by the same user could both
+    //      pass the `existing === undefined` check before either insert ran,
+    //      producing duplicate "pending" rows.
+    //
+    // The fixed query trusts the database to enforce the (userId, provider)
+    // uniqueness — if findFirst returns a row, it belongs to THIS user by
+    // construction. No post-hoc userId check needed.
     const existing = await db.query.accounts.findFirst({
-      where: eq(accounts.provider, typedProvider),
+      where: and(
+        eq(accounts.userId, user.id),
+        eq(accounts.provider, typedProvider),
+      ),
     });
-    if (existing && existing.userId === user.id) {
+    if (existing) {
       return { status: "already_linked", provider: typedProvider };
     }
 

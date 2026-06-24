@@ -81,11 +81,19 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(parseInt(searchParams.get("limit") || "31"), 100);
   const category = searchParams.get("category") || undefined;
 
-  // Cursor validation: must be a parseable ISO 8601 date if present.
-  let cursorDate: Date | undefined;
-  if (rawCursor) {
-    cursorDate = new Date(rawCursor);
-    if (isNaN(cursorDate.getTime())) {
+  // Phase 24 / F6: Cursor validation differs by mode:
+  //   - Search mode (q= present): cursor is a compound token
+  //     "publishedAt|articleId" OR a legacy bare ISO date.
+  //     searchArticles() parses it internally.
+  //   - Feed mode (q= absent): cursor is a bare ISO 8601 date.
+  //     Validated here as before.
+  //
+  // For search mode, we pass the raw string cursor to searchArticles().
+  // For feed mode, we parse + validate it as a Date here.
+  let feedCursorDate: Date | undefined;
+  if (rawCursor && !query) {
+    feedCursorDate = new Date(rawCursor);
+    if (isNaN(feedCursorDate.getTime())) {
       return NextResponse.json(
         {
           error:
@@ -100,10 +108,10 @@ export async function GET(request: NextRequest) {
     let response;
 
     if (query) {
-      // Search mode
+      // Search mode — pass raw cursor string; searchArticles parses it.
       const { results, hasMore, nextCursor } = await searchArticles({
         query,
-        cursor: cursorDate,
+        cursor: rawCursor ?? undefined,
         limit,
       });
 
@@ -113,10 +121,10 @@ export async function GET(request: NextRequest) {
         hasNextPage: hasMore,
       };
     } else {
-      // Feed mode
+      // Feed mode — pass parsed Date cursor.
       const { articles, hasMore, nextCursor } = await getFeedArticles({
         category,
-        cursor: cursorDate,
+        cursor: feedCursorDate,
         limit,
       });
 

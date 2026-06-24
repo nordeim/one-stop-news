@@ -1,5 +1,6 @@
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import NextAuth from "next-auth";
+import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 
 import { env } from "@/lib/env";
 import { authDb } from "@/lib/db/auth";
@@ -17,22 +18,63 @@ import { buildProviders } from "./providers";
  *
  * OAuth providers are loaded only when their env vars are set, so existing
  * deployments without OAuth configuration continue to work unchanged.
+ *
+ * Phase 24 / F5: Replaced 4× `as any` casts with a typed wrapper function
+ * `createPgAdapter()`. The wrapper explicitly specializes DrizzleAdapter's
+ * `SqlFlavor` generic to `PgDatabase` (the postgres variant), which narrows
+ * the schema parameter to `DefaultPostgresSchema`. This eliminates the union
+ * type that prevented per-table `as unknown as` casts from compiling.
+ *
+ * The adapter's DefaultPostgres*Table types enforce a strict column structure
+ * that doesn't match our custom schema (we have extra columns: `role`,
+ * `passwordHash`, `createdAt`). The double cast via `unknown` inside the
+ * wrapper is the minimal escape hatch — the runtime shape is correct
+ * (verified by manual schema inspection), and the adapter accesses columns
+ * by string key at runtime, not by type-level field access.
  */
 
+/**
+ * Creates a DrizzleAdapter specialized for PostgreSQL.
+ *
+ * The `SqlFlavor` generic is pinned to `PgDatabase<PgQueryResultHKT>` so
+ * `DefaultSchema<SqlFlavor>` resolves to `DefaultPostgresSchema` (not the
+ * union of pg/mysql/sqlite). This lets the cast target be the postgres-specific
+ * schema type, which TypeScript accepts.
+ *
+ * Returns `Adapter` (the Auth.js adapter interface) — the same type
+ * `DrizzleAdapter` returns.
+ */
+function createPgAdapter(
+  db: unknown,
+  config: {
+    usersTable: typeof schema.users;
+    accountsTable: typeof schema.accounts;
+    sessionsTable: typeof schema.sessions;
+    verificationTokensTable: typeof schema.verificationTokens;
+  },
+): ReturnType<typeof DrizzleAdapter> {
+  // Cast `db` to the base PgDatabase type. The caller passes `authDb`
+  // (PostgresJsDatabase<typeof schema>), which extends PgDatabase but has
+  // a different schema type parameter. Casting via `unknown` is safe because
+  // DrizzleAdapter only uses the db for query execution, not schema introspection.
+  const pgDb = db as PgDatabase<PgQueryResultHKT>;
+  // Cast the config through `unknown` to the adapter's expected schema type.
+  // Specialized generic context: SqlFlavor = PgDatabase, so the schema is
+  // DefaultPostgresSchema (not the union).
+  return DrizzleAdapter(
+    pgDb,
+    config as unknown as Parameters<
+      typeof DrizzleAdapter<PgDatabase<PgQueryResultHKT>>
+    >[1],
+  );
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: DrizzleAdapter(authDb, {
-    // NOTE: `as any` is required because the adapter's DefaultPostgres*Table types
-    // enforce a strict column structure that doesn't match our custom schema.
-    // Our schema has all required columns (verified manually), just with
-    // different TypeScript shapes. This is a known limitation of the adapter.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    usersTable: schema.users as any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    accountsTable: schema.accounts as any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    sessionsTable: schema.sessions as any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    verificationTokensTable: schema.verificationTokens as any,
+  adapter: createPgAdapter(authDb, {
+    usersTable: schema.users,
+    accountsTable: schema.accounts,
+    sessionsTable: schema.sessions,
+    verificationTokensTable: schema.verificationTokens,
   }),
   trustHost: !!env.AUTH_URL,
   secret: env.AUTH_SECRET,

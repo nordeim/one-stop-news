@@ -300,6 +300,15 @@ export const accounts = pgTable(
       table.provider,
       table.providerAccountId,
     ),
+    // Phase 24 / F3: Enforce (userId, provider) uniqueness at the DB level.
+    // This is the defense-in-depth invariant for linkOAuthProvider — even if
+    // the application-level check has a race condition, the DB rejects the
+    // duplicate insert. The existing onConflictDoNothing() in the action
+    // silently handles the conflict (returns success) instead of throwing.
+    userProviderIdx: uniqueIndex("accounts_user_provider_idx").on(
+      table.userId,
+      table.provider,
+    ),
   }),
 );
 

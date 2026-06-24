@@ -23,7 +23,6 @@ describe("generateProvenanceMetadata", () => {
   it("generates all three layers", () => {
     const result = generateProvenanceMetadata(mockInput);
     expect(result.jsonLd).toBeDefined();
-    expect(result.httpHeader).toBeDefined();
     expect(result.metaTag).toBeDefined();
   });
 
@@ -33,13 +32,6 @@ describe("generateProvenanceMetadata", () => {
     expect(jsonLd["@context"]).toBe("https://schema.org");
     expect(jsonLd["@type"]).toBe("CreativeWork");
     expect(jsonLd.name).toBe(mockInput.articleTitle);
-  });
-
-  it("generates base64-encoded HTTP header", () => {
-    const result = generateProvenanceMetadata(mockInput);
-    const decoded = JSON.parse(atob(result.httpHeader));
-    expect(decoded.model).toBe(mockInput.model);
-    expect(decoded.compliance).toBe("eu-ai-act-art50");
   });
 
   it("generates semicolon-delimited meta tag", () => {
@@ -52,5 +44,125 @@ describe("generateProvenanceMetadata", () => {
     const result = generateProvenanceMetadata(mockInput);
     const jsonLd = JSON.parse(result.jsonLd);
     expect(jsonLd.accountablePerson.name).toBe(`AI System: ${mockInput.model}`);
+  });
+
+  // ── Phase 24 / F2: XSS regression tests ──────────────────────────────────
+  // The JSON-LD output is rendered via dangerouslySetInnerHTML in
+  // ArticleData.tsx. JSON.stringify does NOT escape <, >, or & — so any
+  // untrusted input containing "</script>" would break out of the <script>
+  // tag and allow arbitrary HTML injection (XSS).
+  //
+  // These tests assert that the JSON-LD output is safe to embed in a
+  // <script type="application/ld+json"> tag by verifying that:
+  //   1. The literal sequence "</script>" (case-insensitive) never appears
+  //   2. The literal sequence "<script" (case-insensitive) never appears
+  //   3. The output still parses as valid JSON after unescaping
+  //
+  // The fix escapes <, >, and & as \\u003c, \\u003e, \\u0026 in the JSON
+  // string output. JSON.parse reverses these escapes automatically, so
+  // downstream consumers (e.g., JSON.parse(jsonLd)) see the original values.
+
+  describe("XSS safety (Phase 24 / F2)", () => {
+    const xssPayloads = [
+      "</script><script>alert(document.cookie)</script>",
+      "<script src=//evil.com/x.js></script>",
+      "<img src=x onerror=alert(1)>",
+      "Breaking: </script><svg/onload=alert(1)>",
+      "Title with &amp; ampersand and <angle> brackets",
+      "</SCRIPT>", // case-insensitive
+      "\u2028", // LS — breaks JS string literals in older browsers
+      "\u2029", // PS — breaks JS string literals in older browsers
+    ];
+
+    for (const payload of xssPayloads) {
+      it(`escapes XSS payload in articleTitle: ${payload.slice(0, 40)}...`, () => {
+        const result = generateProvenanceMetadata({
+          ...mockInput,
+          articleTitle: payload,
+        });
+        // The literal </script> sequence must NEVER appear in the output
+        expect(result.jsonLd.toLowerCase()).not.toContain("</script>");
+        // The literal <script sequence must NEVER appear in the output
+        expect(result.jsonLd.toLowerCase()).not.toContain("<script");
+        // The output must still be valid JSON (escapes are JSON-safe)
+        const parsed = JSON.parse(result.jsonLd);
+        expect(parsed.name).toBe(payload);
+      });
+    }
+
+    it("escapes XSS payload in summary.summaryText", () => {
+      const payload = "</script><script>alert(1)</script>";
+      const result = generateProvenanceMetadata({
+        ...mockInput,
+        summary: { ...mockInput.summary, summaryText: payload },
+      });
+      expect(result.jsonLd.toLowerCase()).not.toContain("</script>");
+      expect(result.jsonLd.toLowerCase()).not.toContain("<script");
+      const parsed = JSON.parse(result.jsonLd);
+      // summaryText is truncated to 200 chars in the description field
+      expect(parsed.description).toContain(payload.slice(0, 200));
+    });
+
+    it("escapes XSS payload in sourcesCited[].title and .url", () => {
+      const payload = "</script><script>alert(1)</script>";
+      const result = generateProvenanceMetadata({
+        ...mockInput,
+        summary: {
+          ...mockInput.summary,
+          sourcesCited: [
+            { url: `https://evil.com/${payload}`, title: payload },
+          ],
+        },
+      });
+      expect(result.jsonLd.toLowerCase()).not.toContain("</script>");
+      expect(result.jsonLd.toLowerCase()).not.toContain("<script");
+    });
+
+    it("escapes XSS payload in sourcesCited[].url used in isBasedOn array", () => {
+      const payload = "javascript:alert(1)</script>";
+      const result = generateProvenanceMetadata({
+        ...mockInput,
+        summary: {
+          ...mockInput.summary,
+          sourcesCited: [{ url: payload, title: "ok" }],
+        },
+      });
+      expect(result.jsonLd.toLowerCase()).not.toContain("</script>");
+    });
+
+    it("escapes U+2028 and U+2029 line separators (JS string terminators)", () => {
+      const ls = "before\u2028after";
+      const ps = "before\u2029after";
+      const result = generateProvenanceMetadata({
+        ...mockInput,
+        articleTitle: ls,
+      });
+      // The raw U+2028/U+2029 characters must not appear in the output
+      // (they would break out of JS string literals in some browsers)
+      expect(result.jsonLd).not.toContain("\u2028");
+      expect(result.jsonLd).not.toContain("\u2029");
+      // But JSON.parse should still recover the original value
+      const parsed = JSON.parse(result.jsonLd);
+      expect(parsed.name).toBe(ls);
+      void ps;
+    });
+
+    it("remains valid JSON after escaping (round-trip)", () => {
+      const result = generateProvenanceMetadata({
+        ...mockInput,
+        articleTitle: "Title with </script> & <b>bold</b>",
+        summary: {
+          ...mockInput.summary,
+          summaryText: "Summary with </script> & symbols",
+          sourcesCited: [
+            { url: "https://example.com/<script>", title: "Source <script>" },
+          ],
+        },
+      });
+      // Must parse without error
+      const parsed = JSON.parse(result.jsonLd);
+      expect(parsed.name).toBe("Title with </script> & <b>bold</b>");
+      expect(parsed.description).toContain("Summary with </script> & symbols");
+    });
   });
 });

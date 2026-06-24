@@ -14,19 +14,24 @@ export interface SearchParams {
   query: string;
   categorySlug?: string;
   /**
-   * Cursor for pagination — must be a `Date` object (NOT a string).
+   * Cursor for pagination — a string token produced by a previous
+   * `SearchPage.nextCursor` value.
    *
-   * Callers are responsible for parsing ISO 8601 strings from URL query
-   * params BEFORE calling `searchArticles`. The API boundary at
-   * `src/app/api/articles/route.ts:97-108` performs this validation and
-   * returns HTTP 400 with a descriptive error for invalid ISO 8601 strings.
+   * Phase 24 / F6: The cursor format is now a compound token
+   * `"publishedAt|articleId"` (e.g., `"2024-06-01T12:00:00.000Z|art-031"`).
+   * This enables deterministic pagination when multiple articles share the
+   * same `rank` — the `articleId` tiebreaker ensures no rows are skipped
+   * or duplicated across pages.
    *
-   * TypeScript's `Date` type enforces this contract at compile time —
-   * passing a string here is a type error. This is intentional: the data
-   * layer should not duplicate input validation that the API boundary
-   * already handles.
+   * Backward compatibility: If the cursor is a bare ISO 8601 date string
+   * (the pre-F6 format, without a `|` separator), `searchArticles()` falls
+   * back to date-only filtering. This degrades gracefully — no skip/duplicate
+   * as long as no rank ties exist.
+   *
+   * Callers (e.g., the API route) pass the raw string cursor from the URL
+   * query param. `searchArticles()` parses it internally.
    */
-  cursor?: Date;
+  cursor?: string;
   limit?: number;
 }
 
