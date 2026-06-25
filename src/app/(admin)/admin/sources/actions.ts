@@ -86,12 +86,61 @@ export async function pauseSourceAction(formData: FormData): Promise<void> {
   await pauseSource(id);
 }
 
+/**
+ * Resumes a paused source (sets isActive back to true).
+ *
+ * Symmetric to pauseSource — use this to re-enable ingestion
+ * without losing historical data.
+ */
+export async function resumeSource(id: string) {
+  await verifyAdminSession();
+
+  const [updated] = await db
+    .update(sources)
+    .set({ isActive: true })
+    .where(eq(sources.id, id))
+    .returning();
+
+  revalidatePath("/admin/sources");
+  return updated;
+}
+
+/**
+ * FormData-bound wrapper for resumeSource.
+ *
+ * Server Actions invoked from <form action> receive FormData.
+ * This wrapper extracts the `id` field and delegates.
+ */
+export async function resumeSourceAction(formData: FormData): Promise<void> {
+  const id = formData.get("id");
+  if (typeof id !== "string" || id.length === 0) {
+    throw new Error("id field is required and must be a non-empty string");
+  }
+  await resumeSource(id);
+}
+
+/**
+ * FormData-bound wrapper for deleteSource.
+ *
+ * Server Actions invoked from <form action> receive FormData.
+ * This wrapper extracts the `id` field and delegates.
+ *
+ * Phase 25 (F8 fix): Wired to a confirmation-guarded Delete button in
+ * SourcesData.tsx. The button calls window.confirm() before submitting.
+ */
+export async function deleteSourceAction(formData: FormData): Promise<void> {
+  const id = formData.get("id");
+  if (typeof id !== "string" || id.length === 0) {
+    throw new Error("id field is required and must be a non-empty string");
+  }
+  await deleteSource(id);
+}
+
 export async function deleteSource(id: string) {
   await verifyAdminSession();
 
-  // TODO: Wire to UI — admin sources page currently has no delete button.
-  // This action is tested (actions.test.ts) and ready for use once a
-  // delete button + confirmation dialog is added to SourcesData.tsx.
+  // Phase 25 (F8 fix): Wired to a confirmation-guarded Delete button in
+  // SourcesData.tsx via the deleteSourceAction FormData wrapper.
   // Q3 fix: HARD DELETE — permanently removes the source from the database.
   // The schema has onDelete: "cascade" on articles.sourceId, so this
   // cascade-deletes all associated articles too. Use pauseSource() instead

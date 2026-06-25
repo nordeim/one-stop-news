@@ -11,7 +11,11 @@
 import { getAllSources, getCategoryMap } from "@/features/sources/queries";
 // Phase 22 (N5 fix, audit Report 16): Import pauseSourceAction for the
 // Pause button in each active source row.
-import { pauseSourceAction } from "@/app/(admin)/admin/sources/actions";
+import {
+  pauseSourceAction,
+  resumeSourceAction,
+} from "@/app/(admin)/admin/sources/actions";
+import { DeleteSourceButton } from "./DeleteSourceButton";
 
 /** Source item as returned by the database query. */
 interface SourceRow {
@@ -86,37 +90,43 @@ export function SourceTable({
               {source.failureCount}
             </td>
             <td className="py-3 px-4">
-              {/* Phase 22 (N5 fix, audit Report 16): Wire pauseSource to UI.
-                  Previously the action existed in actions.ts and was tested
-                  in actions.test.ts but no UI button called it — making it
-                  dead code from the user's perspective. Now each active row
-                  has a Pause form button bound to the pauseSourceAction server
-                  action.
+              {/* Phase 22 (N5 fix): Wire pauseSource to UI.
+                  Phase 25 (F8 + F9 fix): Add Resume and Delete buttons.
 
-                  Resume is intentionally NOT wired — that would require a
-                  symmetric `resumeSource` action which is out of scope for
-                  this fix. Paused sources show an em-dash placeholder so the
-                  column doesn't look broken. A future Phase can add the
-                  resume action and replace the placeholder with a Resume
-                  button. */}
-              {source.isActive ? (
-                <form action={pauseSourceAction}>
-                  <input type="hidden" name="id" value={source.id} />
-                  <button
-                    type="submit"
-                    className="font-mono text-[10px] uppercase tracking-widest text-paper-300 hover:text-dispatch-ember transition-colors"
-                  >
-                    Pause
-                  </button>
-                </form>
-              ) : (
-                <span
-                  className="font-mono text-[10px] uppercase tracking-widest text-paper-700"
-                  aria-label="No action available for paused sources"
-                >
-                  —
-                </span>
-              )}
+                  Active sources: [Pause] [Delete]
+                  Paused sources: [Resume] [Delete]
+
+                  Pause/Resume toggle ingestion (isActive flag).
+                  Delete performs a HARD DELETE via db.delete with cascade.
+                  The Delete button uses window.confirm() (browser API) to
+                  guard against accidental irreversible deletion. */}
+              <div className="flex items-center gap-3">
+                {source.isActive ? (
+                  <form action={pauseSourceAction}>
+                    <input type="hidden" name="id" value={source.id} />
+                    <button
+                      type="submit"
+                      className="font-mono text-[10px] uppercase tracking-widest text-paper-300 hover:text-dispatch-ember transition-colors"
+                    >
+                      Pause
+                    </button>
+                  </form>
+                ) : (
+                  <form action={resumeSourceAction}>
+                    <input type="hidden" name="id" value={source.id} />
+                    <button
+                      type="submit"
+                      className="font-mono text-[10px] uppercase tracking-widest text-dispatch-sage hover:text-paper-200 transition-colors"
+                    >
+                      Resume
+                    </button>
+                  </form>
+                )}
+                <DeleteSourceButton
+                  sourceId={source.id}
+                  sourceName={source.name}
+                />
+              </div>
             </td>
           </tr>
         ))}

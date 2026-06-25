@@ -62,7 +62,7 @@ vi.mock("next/cache", () => ({
 }));
 
 // Import after mocks are registered.
-const { pauseSource, deleteSource } = await import("./actions");
+const { pauseSource, resumeSource, deleteSource } = await import("./actions");
 const { db } = await import("@/lib/db");
 
 beforeEach(() => {
@@ -117,5 +117,36 @@ describe("deleteSource — HARD delete (Q3 fix)", () => {
     const { revalidatePath } = await import("next/cache");
     await deleteSource("source-1");
     expect(revalidatePath).toHaveBeenCalledWith("/admin/sources");
+  });
+});
+
+describe("resumeSource — reactivation", () => {
+  it("sets isActive to true via db.update (NOT db.delete)", async () => {
+    await resumeSource("source-1");
+
+    expect(db.update).toHaveBeenCalled();
+    expect(db.delete).not.toHaveBeenCalled();
+    expect(mockUpdateChain.set).toHaveBeenCalledWith(
+      expect.objectContaining({ isActive: true }),
+    );
+  });
+});
+
+describe("resumeSourceAction — FormData wrapper", () => {
+  it("throws when id is missing from FormData", async () => {
+    const { resumeSourceAction } = await import("./actions");
+    const emptyFormData = new FormData();
+    await expect(resumeSourceAction(emptyFormData)).rejects.toThrow(
+      "id field is required and must be a non-empty string",
+    );
+  });
+
+  it("delegates to resumeSource with the extracted id", async () => {
+    const { resumeSourceAction } = await import("./actions");
+    const formData = new FormData();
+    formData.set("id", "source-42");
+    await resumeSourceAction(formData);
+    // The wrapper calls resumeSource which invokes db.update.
+    expect(db.update).toHaveBeenCalled();
   });
 });
