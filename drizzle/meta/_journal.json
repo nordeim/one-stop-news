@@ -43,6 +43,13 @@
       "when": 1781809984820,
       "tag": "0005_neat_wolverine",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1782418186450,
+      "tag": "0006_closed_mother_askani",
+      "breakpoints": true
     }
   ]
 }
