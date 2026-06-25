@@ -1,9 +1,9 @@
 ---
 name: onestopnews
-description: "Complete engineering reference for the OneStopNews codebase — a topic-first news aggregation platform with source-cited AI summaries and EU AI Act Article 50 provenance disclosure. Use this skill when extending the codebase, debugging, onboarding, or replicating the architecture. Covers Next.js 16 + React 19 + Drizzle + BullMQ + Auth.js v5 + Editorial Dispatch design system + 5-layer architecture + 3-layer provenance + content availability guard + 525 tests across 69 suites."
-version: 3.0.0
-last_updated: 2026-06-25
-project_state: "Phase 25 complete · 525 tests / 69 suites · 0 tsc errors · 0 ESLint warnings · 86/78/83/87% coverage · 0 HIGH CVEs · env leak CI guard active"
+description: "Complete engineering reference for the OneStopNews codebase — a topic-first news aggregation platform with source-cited AI summaries and EU AI Act Article 50 provenance disclosure. Use this skill when extending the codebase, debugging, onboarding, or replicating the architecture. Covers Next.js 16 + React 19 + Drizzle + BullMQ + Auth.js v5 + Editorial Dispatch design system + 5-layer architecture + 3-layer provenance + content availability guard + 500 tests across 69 suites."
+version: 2.0.0
+last_updated: 2026-06-24
+project_state: "Phase 23 complete · 500 tests / 69 suites · 0 tsc errors · 0 ESLint warnings · 86/78/83/87% coverage · 0 HIGH CVEs"
 ---
 
 # OneStopNews — Engineering Skill Reference
@@ -1472,56 +1472,38 @@ This is the complete catalog of 34 anti-patterns documented across Phases 1–22
 | 57  | `pnpm.overrides` in `package.json` (pnpm 9.15+) (Phase 23 / BUG-3) | pnpm 9.15+ no longer reads the `pnpm` field — overrides silently ignored, CVEs remain unmitigated.                                          | Move overrides to `pnpm-workspace.yaml` with `packages: []` + `overrides:` block. Delete `pnpm-lock.yaml` + `node_modules/` + reinstall. |
 | 58  | Missing `data-scroll-behavior` on `<html>` (Phase 23 / F5)         | Next.js 16 view transitions warn: "Detected `scroll-behavior: smooth`". Transitions may interfere with smooth scroll.                       | Add `data-scroll-behavior="smooth"` to `<html>` in `layout.tsx`.                                                                         |
 
-### Phase 25 Anti-Patterns (Security & Correctness)
-
-| #   | Anti-Pattern                                                               | Why Forbidden                                                                                                                                                                    | Fix                                                                                                                                                                                                           |
-| :-- | :------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 59  | `JSON.stringify` output in `dangerouslySetInnerHTML` without HTML escaping | `JSON.stringify` does NOT escape `<`, `>`, `&`, U+2028, U+2029. Embedding in `<script type="application/ld+json">` allows `</script>` injection from untrusted RSS titles (XSS). | `escapeForScriptContext()` after `JSON.stringify` — escapes as JSON-compatible `\u003c`, `\u003e`, `\u0026`, `\u2028`, `\u2029`. `JSON.parse()` reverses them automatically (Phase 25 / F2).                  |
-| 60  | Application-level uniqueness check + post-hoc filter (race condition)      | Querying by a subset of the uniqueness key + post-hoc `if (existing.userId === user.id)` check is racy — two concurrent calls can both pass the check.                           | Query by the FULL tuple `and(eq(a, x), eq(b, y))` AND enforce uniqueness at the DB level with a unique index. The post-hoc check is a code smell (Phase 25 / F3).                                             |
-| 61  | Composite `ORDER BY` with single-column cursor                             | `ORDER BY (rank, publishedAt)` with cursor `publishedAt < cursor` skips/duplicates rows when multiple rows share the same rank.                                                  | Add a deterministic tiebreaker (e.g., UUID `id`) to ORDER BY + composite cursor `(publishedAt, id) < (cursor.publishedAt, cursor.id)`. Design cursors as opaque tokens (Phase 25 / F6).                       |
-| 62  | Dead code surviving refactors                                              | When refactoring a function out of use, the function itself often survives because tests keep it "alive" from a coverage perspective.                                            | Always `grep` for ALL consumers before considering a refactor complete. Delete immediately or add a regression test asserting the absence (Phase 25 / F4).                                                    |
-| 63  | `.gitignore` rules added but `git rm --cached` never run                   | `.gitignore` only prevents FUTURE files from being tracked — it does NOT untrack files already in the index. Secrets remain in history.                                          | After adding `.gitignore` rules for sensitive files, run `git ls-files \| grep <pattern>` to verify, and `git rm --cached <file>` for any matches. Add `scripts/check-env-leaks.sh` CI guard (Phase 25 / F1). |
-| 64  | `as any` casts on library generic types                                    | `eslint-disable` comments are an admitted violation of `no-explicit-any`. Library union generics (pg/mysql/sqlite) prevent direct type-safe casts.                               | Wrap the library call in a helper function that pins the generic to the specific variant: `Parameters<typeof LibraryFn<SpecificType>>` (Phase 25 / F5 — `createPgAdapter()`).                                 |
-
 ---
 
 ## 10. Debugging Guide
 
 ### Common Symptoms → Causes → Fixes
 
-| Symptom                                                         | Cause                                                                                     | Fix                                                                                                                            |
-| :-------------------------------------------------------------- | :---------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------- |
-| Page completely unstyled                                        | Missing `@tailwindcss/postcss` plugin                                                     | Install plugin + create `postcss.config.mjs` + `rm -rf .next/`                                                                 |
-| `blocking-route` error                                          | Uncached data fetch outside `<Suspense>`                                                  | Wrap in `<Suspense fallback={<Skeleton />}>`                                                                                   |
-| `next-prerender-current-time`                                   | `new Date()` in Server Component                                                          | Move to Client Component with `useEffect`                                                                                      |
-| Commit Mono not loading                                         | Using `@fontsource/commit-mono`                                                           | Self-host via `next/font/local` with woff2                                                                                     |
-| 64 tsc errors in `skills/`                                      | Vendored code not excluded                                                                | Add `"skills"` to `tsconfig.json` `exclude`                                                                                    |
-| `cacheLife is not a function` in tests                          | No Next.js cache context                                                                  | `vi.mock("next/cache", () => ({ cacheLife: vi.fn() }))`                                                                        |
-| `useSession` requires `SessionProvider`                         | Test doesn't go through layout                                                            | Mock `next-auth/react`                                                                                                         |
-| Rate limit 429 behind CDN                                       | Leftmost XFF IP spoofable                                                                 | Set `TRUSTED_PROXY=true` + `TRUSTED_PROXY_CIDRS`                                                                               |
-| Admin sidebar links 404                                         | Route group `(admin)/` doesn't affect URLs                                                | Add `admin/` subfolder: `(admin)/admin/sources/` (Phase 21)                                                                    |
-| `revalidatePath("/admin/sources")` no-op                        | Same route group issue                                                                    | Fixed by Phase 21 admin folder restructure                                                                                     |
-| API returns 500 instead of 401 (auth)                           | `verifySession()` redirect caught by try/catch                                            | Use `auth()` directly in API routes; remove try/catch (Phase 21)                                                               |
-| Redis outage takes down `/api/articles`                         | Rate limiter throws uncaught                                                              | Fail-open try/catch around `checkRateLimit()` (Phase 21 S7)                                                                    |
-| Redis outage takes down `/api/summarize/[id]`                   | Same as above but asymmetric                                                              | Same fail-open try/catch (Phase 22 / N1)                                                                                       |
-| `pnpm build` fails: weak AUTH_SECRET                            | Production rejects placeholder values                                                     | Generate strong secret: `openssl rand -base64 33` (Phase 21)                                                                   |
-| `.env.local` with real keys in git history                      | `.gitignore` didn't exclude `.env*`                                                       | Untrack + rotate exposed secrets (Phase 21)                                                                                    |
-| CSP `'unsafe-eval'` "removed" but still present                 | Comment claimed removal but value never edited                                            | Actually remove it + add `next.config.test.ts` regression guard (Phase 22 / H1)                                                |
-| Admin sources page has no Pause button                          | `pauseSource` action existed but no UI consumed it                                        | Wire `<form action={pauseSourceAction}>` (Phase 22 / N5)                                                                       |
-| `pnpm format:check` fails on 226+ markdown files                | No `.prettierignore`                                                                      | Create `.prettierignore` (Phase 22 / N6)                                                                                       |
-| `pnpm audit` now fails CI                                       | Hard gate promoted (Phase 22 / F4)                                                        | Apply `pnpm.overrides` or upgrade; if no fix, temporarily re-add `\|\| true` with TODO                                         |
-| Hydration mismatch (date rendering)                             | `new Date()` in Server Component                                                          | Use Client Component wrapper or pass pre-formatted strings                                                                     |
-| Saved HTML snapshots misleading                                 | Stale snapshots during active dev                                                         | Always `curl` the live server for current state                                                                                |
-| External images fail to load                                    | Missing `remotePatterns` in `next.config.ts`                                              | Add `{ protocol: "https", hostname: "picsum.photos", pathname: "/**" }`                                                        |
-| `pnpm test` fails with "Environment variable validation failed" | CI env vars not set                                                                       | Set all 10 required vars in `ci.yml` `env:` block                                                                              |
-| `searchArticles()` returns empty                                | `websearch_to_tsquery` parses differently                                                 | Check `searchVector` weights; ensure `pg_trgm` extension enabled                                                               |
-| `</script>` appearing in rendered JSON-LD `<script>`            | `JSON.stringify` doesn't escape HTML delimiters; untrusted RSS title contains `</script>` | `escapeForScriptContext()` in `provenance.ts` escapes `<>&` + U+2028/2029 (Phase 25 / F2)                                      |
-| Duplicate "pending" rows in `accounts` table                    | `linkOAuthProvider` race condition: query by `provider` only + post-hoc `userId` check    | Query by `(userId, provider)` tuple + DB unique index `accounts_user_provider_idx` (Phase 25 / F3)                             |
-| Search results skip/duplicate across pages                      | Composite `ORDER BY (rank, publishedAt)` with single-column cursor                        | Add `id` tiebreaker to ORDER BY + compound cursor `publishedAt\|articleId` (Phase 25 / F6)                                     |
-| CI fails with "Real .env files are tracked by git"              | `.env*` file accidentally `git add`ed despite `.gitignore`                                | `git rm --cached <file>` + verify `bash scripts/check-env-leaks.sh` passes (Phase 25 / F1)                                     |
-| `tsc` error: `as any` on DrizzleAdapter tables                  | Adapter's union generic (pg/mysql/sqlite) prevents direct type-safe cast                  | Use `createPgAdapter()` wrapper specializing generic to `PgDatabase<PgQueryResultHKT>` (Phase 25 / F5)                         |
-| Migration `0007` fails: "could not create unique index"         | Duplicate `(userId, provider)` rows exist from pre-F3 race condition                      | Run cleanup query in migration file first (deletes "pending-" placeholder rows), then re-run `pnpm db:migrate` (Phase 25 / F3) |
-| `JSON.parse(result.httpHeader)` throws                          | `httpHeader` field was removed in Phase 25 / F4 (dead code)                               | Remove the test — the field no longer exists. Layer 2 is now a static header in `next.config.ts` (Phase 25 / F4)               |
+| Symptom                                                         | Cause                                              | Fix                                                                                    |
+| :-------------------------------------------------------------- | :------------------------------------------------- | :------------------------------------------------------------------------------------- |
+| Page completely unstyled                                        | Missing `@tailwindcss/postcss` plugin              | Install plugin + create `postcss.config.mjs` + `rm -rf .next/`                         |
+| `blocking-route` error                                          | Uncached data fetch outside `<Suspense>`           | Wrap in `<Suspense fallback={<Skeleton />}>`                                           |
+| `next-prerender-current-time`                                   | `new Date()` in Server Component                   | Move to Client Component with `useEffect`                                              |
+| Commit Mono not loading                                         | Using `@fontsource/commit-mono`                    | Self-host via `next/font/local` with woff2                                             |
+| 64 tsc errors in `skills/`                                      | Vendored code not excluded                         | Add `"skills"` to `tsconfig.json` `exclude`                                            |
+| `cacheLife is not a function` in tests                          | No Next.js cache context                           | `vi.mock("next/cache", () => ({ cacheLife: vi.fn() }))`                                |
+| `useSession` requires `SessionProvider`                         | Test doesn't go through layout                     | Mock `next-auth/react`                                                                 |
+| Rate limit 429 behind CDN                                       | Leftmost XFF IP spoofable                          | Set `TRUSTED_PROXY=true` + `TRUSTED_PROXY_CIDRS`                                       |
+| Admin sidebar links 404                                         | Route group `(admin)/` doesn't affect URLs         | Add `admin/` subfolder: `(admin)/admin/sources/` (Phase 21)                            |
+| `revalidatePath("/admin/sources")` no-op                        | Same route group issue                             | Fixed by Phase 21 admin folder restructure                                             |
+| API returns 500 instead of 401 (auth)                           | `verifySession()` redirect caught by try/catch     | Use `auth()` directly in API routes; remove try/catch (Phase 21)                       |
+| Redis outage takes down `/api/articles`                         | Rate limiter throws uncaught                       | Fail-open try/catch around `checkRateLimit()` (Phase 21 S7)                            |
+| Redis outage takes down `/api/summarize/[id]`                   | Same as above but asymmetric                       | Same fail-open try/catch (Phase 22 / N1)                                               |
+| `pnpm build` fails: weak AUTH_SECRET                            | Production rejects placeholder values              | Generate strong secret: `openssl rand -base64 33` (Phase 21)                           |
+| `.env.local` with real keys in git history                      | `.gitignore` didn't exclude `.env*`                | Untrack + rotate exposed secrets (Phase 21)                                            |
+| CSP `'unsafe-eval'` "removed" but still present                 | Comment claimed removal but value never edited     | Actually remove it + add `next.config.test.ts` regression guard (Phase 22 / H1)        |
+| Admin sources page has no Pause button                          | `pauseSource` action existed but no UI consumed it | Wire `<form action={pauseSourceAction}>` (Phase 22 / N5)                               |
+| `pnpm format:check` fails on 226+ markdown files                | No `.prettierignore`                               | Create `.prettierignore` (Phase 22 / N6)                                               |
+| `pnpm audit` now fails CI                                       | Hard gate promoted (Phase 22 / F4)                 | Apply `pnpm.overrides` or upgrade; if no fix, temporarily re-add `\|\| true` with TODO |
+| Hydration mismatch (date rendering)                             | `new Date()` in Server Component                   | Use Client Component wrapper or pass pre-formatted strings                             |
+| Saved HTML snapshots misleading                                 | Stale snapshots during active dev                  | Always `curl` the live server for current state                                        |
+| External images fail to load                                    | Missing `remotePatterns` in `next.config.ts`       | Add `{ protocol: "https", hostname: "picsum.photos", pathname: "/**" }`                |
+| `pnpm test` fails with "Environment variable validation failed" | CI env vars not set                                | Set all 10 required vars in `ci.yml` `env:` block                                      |
+| `searchArticles()` returns empty                                | `websearch_to_tsquery` parses differently          | Check `searchVector` weights; ensure `pg_trgm` extension enabled                       |
 
 ### Debugging Workflow
 
@@ -1547,7 +1529,7 @@ pnpm check
 
 # 2. All tests pass
 pnpm test
-# Expected: 525 tests / 69 suites pass
+# Expected: 500 tests / 69 suites pass
 
 # 3. Coverage above thresholds (80/70/80/80)
 pnpm test -- --coverage
@@ -1560,14 +1542,6 @@ pnpm run format:check
 # 5. Security audit (HARD GATE as of Phase 22 / F4)
 pnpm audit --audit-level=high --prod
 # Expected: exit 0 (1 moderate vuln is acceptable; 0 high/critical required)
-
-# 6. Env leak guard (Phase 25 / F1)
-bash scripts/check-env-leaks.sh
-# Expected: "✅ No .env leaks detected. Only .env.example is tracked."
-
-# 7. Database migrations applied (Phase 25 / F3)
-pnpm db:migrate
-# Expected: All migrations applied (including 0007_accounts_user_provider_unique.sql)
 ```
 
 ### Manual Verification
@@ -1601,18 +1575,12 @@ pnpm db:migrate
 
 ### Security
 
-- [ ] `.env*` files NOT committed (only `.env.example`) — verify with `bash scripts/check-env-leaks.sh`
+- [ ] `.env*` files NOT committed (only `.env.example`)
 - [ ] `AUTH_SECRET` is a strong random value (≥32 chars, not in weak-patterns list)
-- [ ] VAPID keys rotated if previously committed (Phase 25 / F1 — see `SECURITY_REMEDIATION.md`)
 - [ ] CSP does NOT contain `'unsafe-eval'` (regression test in `next.config.test.ts`)
 - [ ] AES-256-GCM IV is 12 bytes (NIST SP 800-38D)
 - [ ] Content availability guard enforced at BOTH action and route layers
 - [ ] Per-user rate limiting on AI-cost endpoints (`/api/summarize`, `requestSummary`)
-- [ ] JSON-LD output escaped via `escapeForScriptContext()` when rendered via `dangerouslySetInnerHTML` (Phase 25 / F2)
-- [ ] OAuth account-linking uses `(userId, provider)` tuple query + DB unique index (Phase 25 / F3)
-- [ ] Search cursor uses compound format with deterministic tiebreaker (Phase 25 / F6)
-- [ ] No `as any` / `eslint-disable` comments in auth adapter (Phase 25 / F5 — `createPgAdapter()`)
-- [ ] No dead code from prior refactors (grep for all consumers before deleting — Phase 25 / F4)
 
 ### Documentation
 
@@ -1688,42 +1656,6 @@ Regex `/<[^>]*>/g` strips tags but not text content. `<script>alert('evil')</scr
 
 **How to avoid:** Always use `cheerio` for HTML parsing. The regex approach misses numeric character references, CDATA sections, and `<script>`/`<style>` content.
 
-#### 11. `.gitignore` Doesn't Untrack Already-Tracked Files (Phase 25 / F1)
-
-Phase 21 added `.gitignore` rules for `.env*` files, but three real env files (`.env`, `.env.local`, `.env.docker`) remained tracked in git — including a real 64-hex `AUTH_SECRET` and real VAPID keypair. The `.gitignore` rules only prevent FUTURE files from being tracked; they do NOT untrack files already in the index.
-
-**How to avoid:** After adding `.gitignore` rules for sensitive files, ALWAYS run `git ls-files | grep <pattern>` to verify no tracked files match. Run `git rm --cached <file>` for any that do. Add a CI guard (`scripts/check-env-leaks.sh`) that fails if any `.env*` file (except `.env.example`) is tracked. Rotate ALL exposed secrets — git history is forever.
-
-#### 12. `JSON.stringify` Is NOT Safe for `<script>` Contexts (Phase 25 / F2)
-
-The JSON-LD provenance was rendered via `dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}`. `JSON.stringify` does NOT escape `<`, `>`, `&`, U+2028, or U+2029. A malicious RSS feed with `title="</script><script>alert(1)</script>"` would break out of the script tag and execute arbitrary JavaScript (XSS). The HTML parser operates BEFORE JavaScript parsing — `</script>` terminates the script tag regardless of being inside a JSON string.
-
-**How to avoid:** When embedding JSON in a `<script>` tag via `dangerouslySetInnerHTML`, ALWAYS escape HTML delimiters after `JSON.stringify`. Use `escapeForScriptContext()` which escapes `<`, `>`, `&` as `\u003c`, `\u003e`, `\u0026` and U+2028/U+2029. These are JSON-compatible escapes — `JSON.parse()` reverses them automatically. See OWASP XSS Prevention Cheat Sheet §Rule 3.1.
-
-#### 13. Application-Level Uniqueness Checks Are Racy (Phase 25 / F3)
-
-`linkOAuthProvider` queried `findFirst({ where: eq(provider, x) })` then did a post-hoc `if (existing.userId === user.id)` check. Two concurrent calls by the same user could both pass the `existing === undefined` check before either insert ran, producing duplicate "pending" account rows.
-
-**How to avoid:** Always enforce uniqueness at the DB level with a unique index. Query by the FULL tuple `and(eq(a, x), eq(b, y))` — don't query by a subset + post-hoc filter. The post-hoc check is a code smell: if you find yourself checking a field after a query, ask why the query didn't filter on it in the first place. Add a DB migration creating the unique index as defense-in-depth.
-
-#### 14. Dead Code Survives Refactors When Tests Keep It "Alive" (Phase 25 / F4)
-
-Phase 23 / BUG-2 moved the `X-AI-Provenance` header from dynamic `metadata.other` to a static value in `next.config.ts`. The fix removed the caller (`page.tsx`) but not the `generateHttpHeader()` function itself. The function survived 2 phases as dead code because the test file kept calling `result.httpHeader` — from a coverage perspective, it looked "used."
-
-**How to avoid:** When refactoring a function out of use, always `grep` for ALL consumers (including test files) before considering the refactor complete. Delete the function immediately, OR add a regression test asserting the absence (a test that verifies the function/export does NOT exist). Add a `// DEAD CODE — safe to remove?` comment to surface it in code review if you're unsure.
-
-#### 15. Library Union Generics Prevent Direct Type-Safe Casts (Phase 25 / F5)
-
-`DrizzleAdapter<SqlFlavor extends SqlFlavorOptions>` is generic over a union of pg/mysql/sqlite flavors. Even though `authDb` is a `PgDatabase` at runtime, `Parameters<typeof DrizzleAdapter>[1]` extracts the parameter type WITHOUT the generic bound — it resolves to the union of all 3 schema types. Per-table `as unknown as UnionType` casts fail because the union includes MySQL/SQLite table types that aren't assignable to the postgres-specific parameter.
-
-**How to avoid:** Wrap the library call in a helper function that explicitly specializes the generic to the specific variant: `function createPgAdapter(db: unknown, config: ...): ReturnType<typeof DrizzleAdapter> { return DrizzleAdapter(db as PgDatabase<PgQueryResultHKT>, config as unknown as Parameters<typeof DrizzleAdapter<PgDatabase<PgQueryResultHKT>>>[1]); }`. This centralizes the escape hatch, eliminates per-field `as any` casts, and self-documents the type-system limitation.
-
-#### 16. Composite ORDER BY Requires a Composite Cursor (Phase 25 / F6)
-
-`searchArticles` used `ORDER BY (rank DESC, publishedAt DESC)` with a single-column cursor `publishedAt < cursor`. When multiple rows shared the same `rank` (common for short queries), the cursor would skip/duplicate rows across pages — articles with the same rank but a later `publishedAt` would be incorrectly included or excluded.
-
-**How to avoid:** If the sort key isn't unique, add a deterministic tiebreaker (like a UUID primary key) to ORDER BY and include it in the cursor. Use a compound cursor format like `"publishedAt|articleId"` with composite filter `(publishedAt < cursor.publishedAt) OR (publishedAt = cursor.publishedAt AND id < cursor.articleId)`. Design cursors as opaque tokens encoding the full sort key. When changing cursor format, provide a backward-compat path for existing clients.
-
 ---
 
 ## 13. Pitfalls to Avoid
@@ -1773,16 +1705,6 @@ Phase 23 / BUG-2 moved the `X-AI-Provenance` header from dynamic `metadata.other
 4. **Don't forget graceful shutdown** — `SIGTERM`/`SIGINT` handlers + `Promise.allSettled`.
 5. **Don't summarize `title_only` / `excerpt` articles** — content availability guard.
 
-### Security & Type-Safety Pitfalls (Phase 25)
-
-1. **Don't assume `.gitignore` untracks already-tracked files** — always run `git rm --cached` after adding rules for sensitive files. Verify with `git ls-files | grep <pattern>`.
-2. **Don't embed `JSON.stringify` output in `<script>` via `dangerouslySetInnerHTML` without escaping** — `</script>` terminates the script tag. Use `escapeForScriptContext()`.
-3. **Don't rely on application-level uniqueness checks** — they're racy. Always add a DB unique index as defense-in-depth.
-4. **Don't use `as any` on library generic types** — wrap in a helper function that pins the generic. `eslint-disable` comments are technical debt.
-5. **Don't use single-column cursors with composite ORDER BY** — add a deterministic tiebreaker (UUID `id`) to both ORDER BY and the cursor.
-6. **Don't leave dead code after refactors** — grep for ALL consumers (including tests) before considering a refactor complete.
-7. **Don't forget to rotate secrets after a leak** — `git filter-repo` purges history, but rotation is the actual mitigation. See `SECURITY_REMEDIATION.md`.
-
 ---
 
 ## 14. Best Practices
@@ -1825,16 +1747,6 @@ Phase 23 / BUG-2 moved the `X-AI-Provenance` header from dynamic `metadata.other
 - **CSS Subgrid** for feed alignment — no fixed heights, no JS measurement
 - **`cacheLife("feed")`** for news feed — 30s stale, 120s revalidate
 - **Lazy DB proxy** — defers connection until first query, prevents build-time crashes
-
-### Security & Type-Safety Best Practices (Phase 25)
-
-- **Escape JSON for script contexts** — `escapeForScriptContext()` after `JSON.stringify` when embedding via `dangerouslySetInnerHTML`. Escapes `<>&` + U+2028/2029 as JSON-compatible `\u00XX` sequences.
-- **Enforce uniqueness at the DB level** — application-level checks are racy. Add unique indexes via Drizzle migrations. Use `onConflictDoNothing()` / `onConflictDoUpdate()` to handle conflicts gracefully.
-- **Wrap library generic calls in helper functions** — when a library's generic type prevents direct type-safe usage (e.g., `DrizzleAdapter<SqlFlavor>` union), create a wrapper that pins the generic to the specific variant. Eliminates `as any` + `eslint-disable` comments.
-- **Use compound cursors with deterministic tiebreakers** — `ORDER BY (rank, publishedAt, id)` with cursor `publishedAt|articleId`. Prevents skip/duplicate on tied sort keys.
-- **Add CI guards for secret hygiene** — `scripts/check-env-leaks.sh` fails CI if `.env*` files are tracked. Catches the root cause of secret leaks (`.gitignore` without `git rm --cached`).
-- **Provide backward-compat paths when changing API contracts** — legacy cursors (bare ISO date) fall back to date-only filtering. New format (`publishedAt|articleId`) is preferred but old clients don't break.
-- **Grep for ALL consumers before deleting code** — `grep -rn "functionName\|\.fieldName" src/` includes test files. Dead code survives when tests keep it "alive" from a coverage perspective.
 
 ---
 
@@ -1967,87 +1879,6 @@ if (
 ```
 
 **Why both:** Server Actions and API routes are separate entry points. Either could be bypassed (e.g., a future admin script). Dual enforcement is defense-in-depth.
-
-### The "escapeForScriptContext" Pattern (Phase 25 / F2)
-
-When embedding JSON in a `<script>` tag via `dangerouslySetInnerHTML`, `JSON.stringify` alone is NOT safe — `</script>` terminates the script tag regardless of being inside a JSON string.
-
-```typescript
-// src/lib/ai/provenance.ts
-function escapeForScriptContext(json: string): string {
-  return json
-    .replace(/</g, "\\u003c")
-    .replace(/>/g, "\\u003e")
-    .replace(/&/g, "\\u0026")
-    .replace(/\u2028/g, "\\u2028")
-    .replace(/\u2029/g, "\\u2029");
-}
-
-function generateJsonLd(input: ProvenanceInput): string {
-  const jsonLd = {
-    /* ... */
-  };
-  return escapeForScriptContext(JSON.stringify(jsonLd, null, 2));
-}
-```
-
-**Why this works:** The `\u003c` escape is JSON-compatible — `JSON.parse()` reverses it automatically. Downstream consumers see the original `<`, `>`, `&` characters. But the HTML parser sees `\u003c/script\u003e` (not `</script>`), so it can't break out of the script tag.
-
-### The "createPgAdapter Wrapper" Pattern (Phase 25 / F5)
-
-When a library's generic type prevents direct type-safe usage, wrap it in a helper that pins the generic.
-
-```typescript
-// src/lib/auth/index.ts
-function createPgAdapter(
-  db: unknown,
-  config: { usersTable: typeof schema.users /* ... */ },
-): ReturnType<typeof DrizzleAdapter> {
-  const pgDb = db as PgDatabase<PgQueryResultHKT>;
-  return DrizzleAdapter(
-    pgDb,
-    config as unknown as Parameters<
-      typeof DrizzleAdapter<PgDatabase<PgQueryResultHKT>>
-    >[1],
-  );
-}
-```
-
-**Why this works:** `DrizzleAdapter<SqlFlavor>` is generic over a union (pg/mysql/sqlite). `Parameters<typeof DrizzleAdapter>[1]` extracts the parameter type WITHOUT the generic bound — resolves to the union. By explicitly specializing `<PgDatabase<PgQueryResultHKT>>` inside the wrapper, `Parameters` resolves to `DefaultPostgresSchema` (not the union), and the cast compiles.
-
-### The "Compound Cursor" Pattern (Phase 25 / F6)
-
-Composite `ORDER BY` requires a composite cursor to prevent skip/duplicate on tied sort keys.
-
-```typescript
-// src/features/search/queries.ts
-function encodeSearchCursor(publishedAt: Date, articleId: string): string {
-  return `${publishedAt.toISOString()}|${articleId}`;
-}
-
-function parseSearchCursor(raw: string): ParsedCursor | undefined {
-  const pipeIdx = raw.indexOf("|");
-  if (pipeIdx === -1) {
-    // Legacy format: bare ISO date — backward compat
-    const date = new Date(raw);
-    return isNaN(date.getTime())
-      ? undefined
-      : { publishedAt: date, articleId: "" };
-  }
-  const [dateStr, articleId] = [raw.slice(0, pipeIdx), raw.slice(pipeIdx + 1)];
-  const date = new Date(dateStr);
-  return isNaN(date.getTime()) || !articleId
-    ? undefined
-    : { publishedAt: date, articleId };
-}
-
-// Composite filter: (publishedAt < cursor) OR (publishedAt = cursor AND id < cursor.id)
-cursorClause = sql`(${articles.publishedAt} < ${parsedCursor.publishedAt}
-  OR (${articles.publishedAt} = ${parsedCursor.publishedAt}
-      AND ${articles.id} < ${parsedCursor.articleId}))`;
-```
-
-**Why this works:** The `id` UUID is a deterministic tiebreaker — no two rows share the same `(publishedAt, id)` tuple. The cursor encodes the full sort key, so pagination is deterministic regardless of DB internals (page splits, index scan order). The backward-compat path (no `|` separator) accepts legacy bare-ISO-date cursors and falls back to date-only filtering.
 
 ---
 
@@ -2494,82 +2325,6 @@ interface PageTransitionProps {
 }
 ```
 
-### Phase 25 Interfaces (Provenance, Search Cursor, Auth)
-
-```typescript
-// src/lib/ai/provenance.ts — Phase 25 / F2 + F4
-// NOTE: httpHeader field was REMOVED in Phase 25 / F4 (dead code).
-// Layer 2 (X-AI-Provenance HTTP header) is now a static value in next.config.ts.
-
-export interface ProvenanceInput {
-  summary: SummarisationOutput;
-  articleId: string;
-  articleUrl: string;
-  articleTitle: string;
-  model: string;
-  generatedAt: string;
-}
-
-export interface ProvenanceResult {
-  /** Layer 1: JSON-LD structured data (escaped for safe <script> embedding via escapeForScriptContext) */
-  jsonLd: string;
-  /** Layer 3: Semicolon-delimited string for HTML <meta name="ai-provenance"> tag */
-  metaTag: string;
-}
-
-// src/features/search/types.ts — Phase 25 / F6
-// NOTE: cursor type changed from `Date` to `string` (compound format).
-
-export interface SearchParams {
-  query: string;
-  categorySlug?: string;
-  /**
-   * Cursor for pagination — a string token produced by a previous SearchPage.nextCursor.
-   * Format: "publishedAt|articleId" (e.g., "2024-06-01T12:00:00.000Z|art-031").
-   * Backward compat: bare ISO date (pre-F6) falls back to date-only filtering.
-   */
-  cursor?: string;
-  limit?: number;
-}
-
-// src/features/search/queries.ts — Phase 25 / F6 (internal, not exported)
-
-interface ParsedCursor {
-  publishedAt: Date;
-  articleId: string; // "" for legacy cursors (date-only)
-}
-
-// src/app/account/actions.ts — Phase 25 / F3
-// NOTE: linkOAuthProvider now queries by (userId, provider) tuple.
-
-export type LinkResult =
-  | { status: "linked"; provider: string }
-  | { status: "already_linked"; provider: string }
-  | { status: "error"; message: string };
-
-// src/lib/db/schema.ts — Phase 25 / F3
-// NOTE: accounts table now has a unique index on (userId, provider).
-// Migration: drizzle/0007_accounts_user_provider_unique.sql
-
-export const accounts = pgTable(
-  "accounts",
-  {
-    /* ... existing columns ... */
-  },
-  (table) => ({
-    providerAccountIdx: uniqueIndex("accounts_provider_account_idx").on(
-      table.provider,
-      table.providerAccountId,
-    ),
-    // Phase 25 / F3: Enforces (userId, provider) uniqueness at the DB level.
-    userProviderIdx: uniqueIndex("accounts_user_provider_idx").on(
-      table.userId,
-      table.provider,
-    ),
-  }),
-);
-```
-
 ---
 
 ## Appendix: The Meticulous Approach (Mandatory 6-Phase Workflow)
@@ -2589,67 +2344,61 @@ All work on this codebase follows this workflow. **Non-negotiable.**
 
 ## Appendix: Quick Reference Card
 
-| What                            | Where                                                                                              |
-| :------------------------------ | :------------------------------------------------------------------------------------------------- |
-| Next.js config                  | `next.config.ts`                                                                                   |
-| Next.js config regression tests | `next.config.test.ts` (Phase 22 — CSP/HSTS/XFO/XCTO guards)                                        |
-| TypeScript config               | `tsconfig.json`                                                                                    |
-| ESLint config                   | `eslint.config.mjs`                                                                                |
-| Vitest config (unit)            | `vitest.config.ts`                                                                                 |
-| Vitest config (integration)     | `vitest.integration.config.ts`                                                                     |
-| Playwright config               | `playwright.config.ts`                                                                             |
-| PostCSS config                  | `postcss.config.mjs`                                                                               |
-| Prettier ignore                 | `.prettierignore` (Phase 22 / N6)                                                                  |
-| Global CSS + design tokens      | `src/app/globals.css`                                                                              |
-| Root layout                     | `src/app/layout.tsx`                                                                               |
-| Network boundary                | `proxy.ts` (repo root)                                                                             |
-| DB schema                       | `src/lib/db/schema.ts`                                                                             |
-| Lazy DB proxy                   | `src/lib/db/index.ts`                                                                              |
-| Env validation (Zod)            | `src/lib/env/index.ts`                                                                             |
-| Auth config                     | `src/lib/auth/index.ts`                                                                            |
-| Auth DAL                        | `src/lib/auth/dal.ts`                                                                              |
-| Auth providers                  | `src/lib/auth/providers.ts`                                                                        |
-| BullMQ queues                   | `src/lib/queue/index.ts`                                                                           |
-| FlowProducer DAG                | `src/lib/queue/flows.ts`                                                                           |
-| Rate limiter                    | `src/lib/rateLimit.ts`                                                                             |
-| Trusted proxy CIDR walker       | `src/lib/network/getClientIp.ts`                                                                   |
-| Push key encryption             | `src/lib/security/encrypt.ts`                                                                      |
-| AI prompts                      | `src/lib/ai/prompts.ts`                                                                            |
-| 3-layer provenance              | `src/lib/ai/provenance.ts`                                                                         |
-| Worker entry                    | `src/workers/index.ts`                                                                             |
-| RSS parser                      | `src/workers/jobs/parseFeed.ts`                                                                    |
-| AI summarizer                   | `src/workers/jobs/summarize.ts`                                                                    |
-| Content guard                   | `src/workers/jobs/determineContentAvailability.ts`                                                 |
-| Cache invalidation              | `src/workers/lib/cacheInvalidation.ts`                                                             |
-| Feed queries                    | `src/features/feed/queries.ts`                                                                     |
-| ArticleCard                     | `src/features/feed/components/ArticleCard.tsx`                                                     |
-| Summary actions                 | `src/features/summaries/actions.ts`                                                                |
-| NutritionLabel                  | `src/features/summaries/components/NutritionLabel.tsx`                                             |
-| Account page                    | `src/app/account/page.tsx`                                                                         |
-| Admin sources actions           | `src/app/(admin)/admin/sources/actions.ts`                                                         |
-| Admin summaries page            | `src/app/(admin)/admin/summaries/page.tsx`                                                         |
-| Domain types                    | `src/domain/articles/types.ts`                                                                     |
-| Domain normalize                | `src/domain/articles/normalize.ts`                                                                 |
-| Importance scoring              | `src/domain/ranking/score.ts`                                                                      |
-| `cn()` utility                  | `src/shared/lib/utils.ts`                                                                          |
-| Button                          | `src/shared/components/ui/Button.tsx`                                                              |
-| useDebounce                     | `src/shared/hooks/useDebounce.ts`                                                                  |
-| useReducedMotion                | `src/shared/hooks/useReducedMotion.ts`                                                             |
-| PageTransition                  | `src/components/primitives/PageTransition.tsx`                                                     |
-| CI pipeline                     | `.github/workflows/ci.yml`                                                                         |
-| E2E pipeline                    | `.github/workflows/e2e.yml`                                                                        |
-| Pre-commit hook                 | `.husky/pre-commit`                                                                                |
-| Env leak CI guard               | `scripts/check-env-leaks.sh` (Phase 25 / F1)                                                       |
-| Security remediation runbook    | `SECURITY_REMEDIATION.md` (Phase 25 / F1)                                                          |
-| Accounts unique index migration | `drizzle/0007_accounts_user_provider_unique.sql` (Phase 25 / F3)                                   |
-| XSS escape helper               | `escapeForScriptContext()` in `src/lib/ai/provenance.ts` (Phase 25 / F2)                           |
-| Type-safe auth adapter wrapper  | `createPgAdapter()` in `src/lib/auth/index.ts` (Phase 25 / F5)                                     |
-| Compound cursor helpers         | `parseSearchCursor()` / `encodeSearchCursor()` in `src/features/search/queries.ts` (Phase 25 / F6) |
+| What                            | Where                                                       |
+| :------------------------------ | :---------------------------------------------------------- |
+| Next.js config                  | `next.config.ts`                                            |
+| Next.js config regression tests | `next.config.test.ts` (Phase 22 — CSP/HSTS/XFO/XCTO guards) |
+| TypeScript config               | `tsconfig.json`                                             |
+| ESLint config                   | `eslint.config.mjs`                                         |
+| Vitest config (unit)            | `vitest.config.ts`                                          |
+| Vitest config (integration)     | `vitest.integration.config.ts`                              |
+| Playwright config               | `playwright.config.ts`                                      |
+| PostCSS config                  | `postcss.config.mjs`                                        |
+| Prettier ignore                 | `.prettierignore` (Phase 22 / N6)                           |
+| Global CSS + design tokens      | `src/app/globals.css`                                       |
+| Root layout                     | `src/app/layout.tsx`                                        |
+| Network boundary                | `proxy.ts` (repo root)                                      |
+| DB schema                       | `src/lib/db/schema.ts`                                      |
+| Lazy DB proxy                   | `src/lib/db/index.ts`                                       |
+| Env validation (Zod)            | `src/lib/env/index.ts`                                      |
+| Auth config                     | `src/lib/auth/index.ts`                                     |
+| Auth DAL                        | `src/lib/auth/dal.ts`                                       |
+| Auth providers                  | `src/lib/auth/providers.ts`                                 |
+| BullMQ queues                   | `src/lib/queue/index.ts`                                    |
+| FlowProducer DAG                | `src/lib/queue/flows.ts`                                    |
+| Rate limiter                    | `src/lib/rateLimit.ts`                                      |
+| Trusted proxy CIDR walker       | `src/lib/network/getClientIp.ts`                            |
+| Push key encryption             | `src/lib/security/encrypt.ts`                               |
+| AI prompts                      | `src/lib/ai/prompts.ts`                                     |
+| 3-layer provenance              | `src/lib/ai/provenance.ts`                                  |
+| Worker entry                    | `src/workers/index.ts`                                      |
+| RSS parser                      | `src/workers/jobs/parseFeed.ts`                             |
+| AI summarizer                   | `src/workers/jobs/summarize.ts`                             |
+| Content guard                   | `src/workers/jobs/determineContentAvailability.ts`          |
+| Cache invalidation              | `src/workers/lib/cacheInvalidation.ts`                      |
+| Feed queries                    | `src/features/feed/queries.ts`                              |
+| ArticleCard                     | `src/features/feed/components/ArticleCard.tsx`              |
+| Summary actions                 | `src/features/summaries/actions.ts`                         |
+| NutritionLabel                  | `src/features/summaries/components/NutritionLabel.tsx`      |
+| Account page                    | `src/app/account/page.tsx`                                  |
+| Admin sources actions           | `src/app/(admin)/admin/sources/actions.ts`                  |
+| Admin summaries page            | `src/app/(admin)/admin/summaries/page.tsx`                  |
+| Domain types                    | `src/domain/articles/types.ts`                              |
+| Domain normalize                | `src/domain/articles/normalize.ts`                          |
+| Importance scoring              | `src/domain/ranking/score.ts`                               |
+| `cn()` utility                  | `src/shared/lib/utils.ts`                                   |
+| Button                          | `src/shared/components/ui/Button.tsx`                       |
+| useDebounce                     | `src/shared/hooks/useDebounce.ts`                           |
+| useReducedMotion                | `src/shared/hooks/useReducedMotion.ts`                      |
+| PageTransition                  | `src/components/primitives/PageTransition.tsx`              |
+| CI pipeline                     | `.github/workflows/ci.yml`                                  |
+| E2E pipeline                    | `.github/workflows/e2e.yml`                                 |
+| Pre-commit hook                 | `.husky/pre-commit`                                         |
 
 ---
 
-**End of `onestopnews_SKILL.md` v3.0.0**
+**End of `onestopnews_SKILL.md` v2.0.0**
 
-_This skill file is derived from `AGENTS.md` (canonical institutional knowledge), `MASTER_EXECUTION_PLAN.md` v7.0, `CLAUDE.md`, `README.md`, and the actual source tree. For exhaustive per-phase gotchas, consult `AGENTS.md` §Phase N directly. For the engineering blueprint, consult `MASTER_EXECUTION_PLAN.md` v7.0. Phase 25 additions cover the F1-F6 independent code audit & TDD remediation (secret hygiene, XSS prevention, race condition fix, dead code removal, type-safe adapter, compound cursor pagination)._
+_This skill file is derived from `AGENTS.md` (canonical institutional knowledge), `MASTER_EXECUTION_PLAN.md` v7.0, `CLAUDE.md`, `README.md`, and the actual source tree. For exhaustive per-phase gotchas, consult `AGENTS.md` §Phase N directly. For the engineering blueprint, consult `MASTER_EXECUTION_PLAN.md` v7.0._
 
-**Last Updated:** June 25, 2026 (Phase 25 — Independent Code Audit & TDD Remediation complete. 525 tests / 69 suites. All quality gates green. 6 deployment actions outstanding: rotate `AUTH_SECRET` + VAPID keys [F1], apply migration `0007` [F3], wire `check-env-leaks.sh` into CI + pre-commit [F1], switch `pnpm dev` → `pnpm start` [BUG-1], start Redis [BUG-4], set `TRUSTED_PROXY=true` + Cloudflare CIDRs [BUG-5].)
+**Last Updated:** June 24, 2026 (Phase 23 — Live Site E2E Audit Remediation complete. 500 tests / 69 suites. All quality gates green. 3 deployment recommendations outstanding: switch `pnpm dev` → `pnpm start`, start Redis, set `TRUSTED_PROXY=true`.)

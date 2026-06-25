@@ -2849,16 +2849,102 @@ Also fixed the malformed `className` (`vspaceError` → proper Tailwind classes)
 
 ---
 
+## Phase 25: Independent Code Audit & TDD Remediation — Lessons Learned
+
+### Phase 25 Overview
+
+A fresh independent code audit (not referencing the existing `Codebase_Review_Validation_Report_*.md` files) surfaced 1 Critical + 2 High + 3 Medium findings. All were remediated via strict TDD (RED → GREEN → REFACTOR → VERIFY), adding 21 net regression tests. The audit was conducted using the project's own `skills/code-review-and-quality_SKILL.md` (five-axis review: Correctness, Readability, Architecture, Security, Performance) plus the `skills/vulnerability-scanner` skill (OWASP Top 10:2025 lens).
+
+**Test progression**: 504/69 → 525/69 (+21 net regression tests). All quality gates green: `pnpm check` (0 TS errors, 0 ESLint warnings) + `pnpm test` (525 green) + `bash scripts/check-env-leaks.sh` (✅).
+
+### Phase 25 Gotchas Discovered
+
+#### F1: Real Secrets Committed to Git History (CRITICAL)
+
+**Issue**: Despite Phase 21 adding `.gitignore` rules for `.env*` files (`.env`, `.env.*`, `!.env.example`), three real env files remained tracked in git: `.env`, `.env.local`, `.env.docker`. The `.env.local` file contained a real 64-hex `AUTH_SECRET` (`b9932a15d9e7e6da3b2c2bda7ad2ddb0ed20f63785e9981af419c1949d43e7ab`) and real VAPID keypair — not placeholders. The root cause: Phase 21 added the `.gitignore` rules but never ran `git rm --cached` on the already-tracked files. The files entered history in commit `282c2d8 v1 stable rel`.
+
+**Fix**: Ran `git rm --cached .env .env.local .env.docker` (files remain on disk, untracked). Created `scripts/check-env-leaks.sh` CI guard that fails if any `.env*` file (except `.env.example`) is tracked. Created `SECURITY_REMEDIATION.md` documenting the full rotation runbook (AUTH_SECRET + VAPID keys must be rotated before deploying).
+
+**Lesson**: `.gitignore` rules only prevent FUTURE files from being tracked — they do NOT untrack files already in the index. After adding `.gitignore` rules for sensitive files, ALWAYS run `git ls-files | grep <pattern>` to verify no tracked files match, and `git rm --cached <file>` for any that do. A CI guard script catches this automatically for future contributors. (Anti-pattern #21 updated, new anti-pattern #43 added.)
+
+#### F2: XSS via `dangerouslySetInnerHTML` in JSON-LD Provenance (HIGH)
+
+**Issue**: The article detail page (`ArticleData.tsx:96`) renders JSON-LD provenance via `<script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript }} />`. The `jsonLdScript` is produced by `JSON.stringify()` in `provenance.ts`. `JSON.stringify` does NOT escape `<`, `>`, `&`, U+2028, or U+2029. The article title flows from RSS feeds (untrusted) → `parseFeed.ts:152` (stores `raw.title.trim()` without HTML stripping) → `articles.title` → `generateProvenanceMetadata({ articleTitle: article.title })` → `generateJsonLd()` → `JSON.stringify` → `dangerouslySetInnerHTML`. A malicious RSS feed with `title="</script><script>alert(document.cookie)</script>"` would break out of the script tag and execute arbitrary JavaScript (XSS).
+
+**Fix**: Added `escapeForScriptContext()` helper in `provenance.ts` that escapes `<`, `>`, `&` as `\u003c`, `\u003e`, `\u0026` and U+2028/U+2029 as `\u2028`/`\u2029` after `JSON.stringify`. These are JSON-compatible escape sequences — `JSON.parse()` reverses them automatically, so downstream consumers see the original values. 8 regression tests in `provenance.test.ts` covering 6 XSS payloads (including `</script>`, `<script src=//evil.com/x.js>`, `<img src=x onerror=alert(1)>`, `</SCRIPT>` case-insensitive, U+2028 LS, U+2029 PS) + round-trip JSON validity.
+
+**Lesson**: `JSON.stringify` is NOT safe for embedding in HTML `<script>` tags. The `</script>` sequence terminates the script tag early regardless of being inside a JSON string — the HTML parser operates before JavaScript parsing. Always escape HTML delimiters (`<`, `>`, `&`) and JS string terminators (U+2028, U+2029) when embedding JSON in a script context. See OWASP XSS Prevention Cheat Sheet §Rule 3.1. (New anti-pattern #40.)
+
+#### F3: `linkOAuthProvider` Race Condition + Query Scope Bug (HIGH)
+
+**Issue**: The `linkOAuthProvider` server action in `src/app/account/actions.ts` queried `findFirst({ where: eq(accounts.provider, typedProvider) })` — filtering by `provider` ONLY. It then did a post-hoc `if (existing && existing.userId === user.id)` check. Two bugs: (1) The query returned ANY user's row matching the provider, leaking account existence to other users and wasting a round-trip. (2) Two concurrent calls by the same user could both pass the `existing === undefined` check before either insert ran, producing duplicate "pending" account rows with `providerAccountId: pending-${Date.now()}` (unique timestamps, so `onConflictDoNothing` on `(provider, providerAccountId)` didn't trigger).
+
+**Fix**: Changed query to `and(eq(accounts.userId, user.id), eq(accounts.provider, typedProvider))` — trusts the DB to enforce the tuple uniqueness. Removed the post-hoc `userId` check (no longer needed). Added DB-level unique index `accounts_user_provider_idx` via migration `0007_accounts_user_provider_unique.sql` as defense-in-depth — even if the application-level check races, the DB rejects the duplicate insert (the existing `onConflictDoNothing()` handles it gracefully). 5 regression tests including a structural assertion that the `where` clause references both `user_id` and `provider` columns.
+
+**Lesson**: Application-level uniqueness checks are inherently racy. Always enforce uniqueness at the DB level with a unique index, and query by the FULL tuple (not a subset + post-hoc filter). The post-hoc `if (existing.userId === user.id)` check was a code smell — it meant the query wasn't scoped correctly. If you find yourself checking a field after a query, ask why the query didn't filter on it in the first place. (New anti-pattern #41.)
+
+#### F4: Dead `generateHttpHeader()` Function (MEDIUM)
+
+**Issue**: The `generateHttpHeader()` function in `provenance.ts` returned a base64-encoded JSON payload, exposed via `ProvenanceResult.httpHeader`. But after Phase 23 / BUG-2 moved the `X-AI-Provenance` header to a static value in `next.config.ts` (`"eu-ai-act-art50-compliant; disclosure-in-meta-and-jsonld"`), no production code read `result.httpHeader` — only the test file did (`provenance.test.ts:38-43` tested `atob(result.httpHeader)`). The function survived 2 phases as dead code. Additionally, the function's docstring still claimed "Set via generateMetadata() `other` field in Next.js App Router" — which was the exact anti-pattern (#35/#36) fixed in Phase 23 / BUG-2.
+
+**Fix**: Removed `generateHttpHeader()`, the `httpHeader` field from `ProvenanceResult` interface, and the dead test "generates base64-encoded HTTP header". Updated the file-level docstring to document that Layer 2 is now static in `next.config.ts` (not generated dynamically).
+
+**Lesson**: When refactoring a function out of use (e.g., Phase 23 / BUG-2 moved the header from dynamic `metadata.other` to static `next.config.ts`), always `grep` for ALL consumers before considering the refactor complete. The Phase 23 fix removed the caller (`page.tsx`) but not the function itself — it survived because the test file kept it "alive" from a coverage perspective. Add a regression test asserting the absence, or delete immediately with a `// DEAD CODE — safe to remove?` comment to surface it in code review. (New anti-pattern #43.)
+
+#### F5: 4× `as any` Casts in DrizzleAdapter Config (MEDIUM)
+
+**Issue**: `src/lib/auth/index.ts` used `as any` (with `// eslint-disable-next-line @typescript-eslint/no-explicit-any` comments) for 4 table mappings in the `DrizzleAdapter` config: `usersTable`, `accountsTable`, `sessionsTable`, `verificationTokensTable`. The project's own ESLint config (`eslint.config.mjs:28`) sets `@typescript-eslint/no-explicit-any: "error"` — the disables were an admitted violation. Root cause: `DrizzleAdapter<SqlFlavor extends SqlFlavorOptions>` is generic over a union of pg/mysql/sqlite flavors (`SqlFlavorOptions = AnyPostgresDatabase | AnyMySqlDatabase | AnySQLiteDatabase`). When called with `authDb` (a `PgDatabase`), TypeScript infers `SqlFlavor = PgDatabase`, which SHOULD narrow `DefaultSchema<SqlFlavor>` to `DefaultPostgresSchema`. But `Parameters<typeof DrizzleAdapter>[1]` extracts the parameter type WITHOUT the generic bound — it resolves to the union of all 3 schema types, and per-table casts to the union fail because the union includes MySQL/SQLite table types that aren't assignable to the postgres-specific parameter.
+
+**Fix**: Created a `createPgAdapter()` wrapper function that explicitly specializes the generic to `PgDatabase<PgQueryResultHKT>`. Inside the wrapper, `Parameters<typeof DrizzleAdapter<PgDatabase<PgQueryResultHKT>>>[1]` resolves to `DefaultPostgresSchema` (not the union), and the table config accepts our schema's tables via `as unknown as` (no `any`). The wrapper returns `ReturnType<typeof DrizzleAdapter>` (the `Adapter` interface). Zero `eslint-disable` comments. The `db` parameter is typed as `unknown` and cast to `PgDatabase` inside (safe because `PostgresJsDatabase` extends `PgDatabase`).
+
+**Lesson**: When a library's generic type prevents direct type-safe usage, wrap it in a helper function that pins the generic to the specific variant you need. `Parameters<typeof LibraryFn<SpecificType>>` extracts the expected parameter type for that variant. This is cleaner than per-field `as any` casts and self-documents the type-system limitation. The wrapper function approach also centralizes the escape hatch — if the library fixes its types in a future version, you only need to update one function. (Anti-pattern #1 updated.)
+
+#### F6: Search Cursor Pagination Bug (MEDIUM)
+
+**Issue**: `searchArticles` in `src/features/search/queries.ts` used `ORDER BY (rank DESC, publishedAt DESC)` with a single-column cursor `publishedAt < cursor`. When multiple rows shared the same `rank` (common for short queries or common terms where `ts_rank_cd` produces tied floating-point scores), the cursor would skip/duplicate rows across pages — articles with the same rank as the last-seen row but a later `publishedAt` would be incorrectly included or excluded. The `nextCursor` was a bare ISO date string (`resultRows[last].publishedAt.toISOString()`), and the API route validated it as ISO 8601.
+
+**Fix**: Added `articles.id` as a deterministic tiebreaker to ORDER BY (`desc(rank), desc(publishedAt), desc(id))`). Changed cursor to compound format `"publishedAt|articleId"` (e.g., `"2024-06-01T12:00:00.000Z|art-031"`) with composite filter `(publishedAt < cursor.publishedAt) OR (publishedAt = cursor.publishedAt AND id < cursor.articleId)`. Added `parseSearchCursor()` + `encodeSearchCursor()` helpers. Backward-compatible: legacy bare-ISO-date cursors (pre-F6 format, without `|` separator) fall back to date-only filtering via `lt(articles.publishedAt, parsedCursor.publishedAt)` — degraded but functional (no skip/duplicate as long as no rank ties exist). Updated `SearchParams.cursor` type from `Date` to `string` (the data layer now owns cursor parsing). Updated API route to pass raw cursor string to `searchArticles` for search mode, keeping Date parsing for feed mode. 7 regression tests including tied-rank pagination, compound cursor encoding/decoding, backward compat with legacy cursors, and ORDER BY structural assertion.
+
+**Lesson**: Composite `ORDER BY` requires a composite cursor. If the sort key isn't unique, add a deterministic tiebreaker (like a UUID primary key) to the ORDER BY and include it in the cursor. Without a tiebreaker, pagination is non-deterministic — the same cursor may return different results depending on DB internals (page splits, index scan order, etc.). Always design cursors to be opaque tokens that encode the full sort key — don't expose the internal format to clients, and always provide a backward-compat path when changing the format. (New anti-pattern #42.)
+
+### Phase 25 Recommendations
+
+#### P0 — Immediate (before deploying)
+
+1. **Rotate `AUTH_SECRET`** — generate with `openssl rand -hex 32`, update `.env.local` on all environments. All existing JWT sessions will be invalidated (users must sign in again).
+2. **Rotate VAPID keypair** — generate with `npx web-push generate-vapid-keys`, update `.env.local`. All existing push subscriptions will need re-subscription (the public key change invalidates them).
+3. **Apply migration `0007`** — run `pnpm db:migrate` to create the `accounts_user_provider_idx` unique index. If duplicate `(userId, provider)` rows exist (from the pre-fix race condition), the migration will fail — run the cleanup query documented in the migration file first (deletes "pending-" placeholder rows).
+
+#### P1 — High (this sprint)
+
+4. **Wire env leak guard into CI** — add `bash scripts/check-env-leaks.sh` to `.github/workflows/ci.yml` after the install step. Fails CI if any `.env*` (except `.env.example`) is tracked.
+5. **Wire env leak guard into pre-commit** — add `bash scripts/check-env-leaks.sh` to `.husky/pre-commit` before `lint-staged`. Prevents the commit from succeeding if a `.env*` file is staged.
+6. **Purge git history (optional)** — use `git filter-repo --path .env --path .env.local --path .env.docker --invert-paths` to remove secrets from history. Coordinate with all contributors (requires re-clone). The rotation in P0 mitigates risk, but history purging is best practice for any future audit/clone.
+
+#### P2 — Mid-term
+
+7. **Migrate to nonce-based CSP** — carried over from Phase 21 R2. Removes `'unsafe-inline'` from `script-src` via Next.js 16's `headers()` nonce pattern.
+8. **Add secret scanning to CI** — integrate `gitleaks` or `trufflehog` to catch future leaks before they enter history. Complements the `check-env-leaks.sh` guard (which only checks `.env*` filenames, not content patterns).
+9. **Move secrets to a secrets manager** — AWS Secrets Manager, Doppler, or HashiCorp Vault. `.env` files are acceptable for local dev only; production should inject secrets at runtime.
+
+#### P3 — Backlog
+
+10. **`deleteSource` UI wiring** — carried over from Phase 22 / N5. The action is tested but has no UI button. Needs a Shadcn confirmation dialog before wiring (irreversible hard delete with cascade).
+11. **`resumeSource` action** — symmetric to `pauseSource`, currently a no-op placeholder (`—` em-dash) in `SourcesData.tsx`. Add `resumeSource(id)` + `resumeSourceAction(formData)` + wire a Resume button on paused rows.
+12. **Feed cursor pagination hardening** — `getFeedArticles` still uses date-only cursor. Feed results are ordered by `publishedAt` alone (no rank, so no ties), meaning the bug doesn't manifest — but applying the same composite cursor pattern would be defense-in-depth for future sort changes.
+
+---
+
 ## Contact & Maintenance
 
 - **Maintained by**: Senior Engineering, Tech Leads, DevOps
 - **Authoritative Sources**: `Project_Architecture_Document_v4.5.md` | `Project_Requirements_Document_v4.3.md` | `README.md`
-- **Last Updated**: June 24, 2026 (Phase 24 — Runtime Hydration Fix & Pre-Commit Hook Recovery: `UserMenu.tsx` mounted guard fix, `getArticleWithSummary` status guard (C1), `getArticleIdFromSummary` hasSummary sync (C2); Phase 23 — `X-AI-Provenance` HTTP header fix [BUG-2], `pnpm-workspace.yaml` for pnpm 9.15+ overrides [BUG-3], `data-scroll-behavior` attribute [F5])
-- **Total Tests**: 504 across 69 suites + 10 Playwright E2E + 4 axe-core a11y scans + 4 DB integration tests (3 Docker-gated, 1 always-pass) (all green).
-- **Quality Gate**: `pnpm check` (tsc --noEmit + ESLint --max-warnings 0) + `pnpm test` (vitest run) + `pnpm test -- --coverage` (enforced in CI at 80/80/70/80 thresholds) + `pnpm run format:check` + `pnpm audit --audit-level=high --prod` (HARD GATE as of Phase 22 / F4) — all green
+- **Last Updated**: June 25, 2026 (Phase 25 — Independent Code Audit & TDD Remediation: F1 secrets untracked + `check-env-leaks.sh` CI guard + `SECURITY_REMEDIATION.md`, F2 XSS JSON-LD escape via `escapeForScriptContext()`, F3 `linkOAuthProvider` race fix + `accounts_user_provider_idx` unique index [migration `0007`], F4 dead `generateHttpHeader()` removed, F5 4× `as any` → `createPgAdapter()` typed wrapper, F6 search cursor compound `publishedAt|articleId` with `id` tiebreaker; 4 new anti-patterns #40-43; Phase 24 — `UserMenu.tsx` hydration fix, `getArticleWithSummary` status guard [C1], `getArticleIdFromSummary` hasSummary sync [C2]; Phase 23 — `X-AI-Provenance` HTTP header fix [BUG-2], `pnpm-workspace.yaml` for pnpm 9.15+ overrides [BUG-3], `data-scroll-behavior` attribute [F5])
+- **Total Tests**: 525 across 69 suites + 10 Playwright E2E + 4 axe-core a11y scans + 4 DB integration tests (3 Docker-gated, 1 always-pass) (all green).
+- **Quality Gate**: `pnpm check` (tsc --noEmit + ESLint --max-warnings 0) + `pnpm test` (vitest run) + `pnpm test -- --coverage` (enforced in CI at 80/80/70/80 thresholds) + `pnpm run format:check` + `pnpm audit --audit-level=high --prod` (HARD GATE as of Phase 22 / F4) + `bash scripts/check-env-leaks.sh` (Phase 25 / F1) — all green
 - **Pre-commit Hooks**: husky + lint-staged (Phase 19 / M10) — runs eslint + prettier on staged `.ts`/`.tsx` before every commit
 - **Coverage**: 85.96% lines / 78.10% branches / 82.58% functions / 86.87% statements (above the 80/70/80/80 thresholds)
-- **Deployment Status**: All Phase 23-24 code fixes applied. 3 deployment recommendations outstanding from Phase 23: switch `pnpm dev` → `pnpm start` [BUG-1], start Redis [BUG-4], set `TRUSTED_PROXY=true` + Cloudflare CIDRs [BUG-5].
+- **Deployment Status**: All Phase 23-25 code fixes applied. Outstanding deployment actions: (Phase 25) rotate `AUTH_SECRET` + VAPID keys [F1], apply migration `0007` [F3], wire `check-env-leaks.sh` into CI + pre-commit [F1]; (Phase 23) switch `pnpm dev` → `pnpm start` [BUG-1], start Redis [BUG-4], set `TRUSTED_PROXY=true` + Cloudflare CIDRs [BUG-5].
 
 ---
 
