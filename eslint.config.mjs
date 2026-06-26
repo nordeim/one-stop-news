@@ -7,7 +7,8 @@ export default [
     ignores: [
       ".next/**",
       "node_modules/**",
-      "drizzle/**",
+      "drizzle/**/*.sql",
+      "drizzle/**/*.json",
       "dist/**",
       "playwright.config.ts",
       "skills/**",
