@@ -1,6 +1,6 @@
 ---
 name: brutalist-portfolio-nextjs
-description: "Comprehensive skill document for a Next.js 16 brutalist portfolio. Covers the complete architecture, design system, 16 active components, 8+ remediation phases, 52 lessons learnt, and every coding pattern/anti-pattern discovered. Any coding agent should be able to reconstruct this exact codebase from this document alone."
+description: Complete Next.js 16 + React 19 + TypeScript strict brutalist portfolio reference. App Router, Server Components, 16 components, design system with Tailwind v4 CSS-first @theme, 8+ remediation phases, 52 lessons learned. Covers WCAG AAA accessibility, custom hooks, anti-pattern debugging, before/after debugging, mobile nav debugging. Use when building brutalist/avant-garde portfolio sites or reconstructing a production-grade Next.js portfolio from scratch.
 ---
 
 # Nicholas Yun — The Engineered Soul: Complete Skill Reference (v6)
